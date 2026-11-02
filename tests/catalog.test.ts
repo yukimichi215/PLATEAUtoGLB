@@ -40,4 +40,10 @@ describe('データカタログの答えの整理', () => {
       'https://api.plateauview.mlit.go.jp/datacatalog/citygml/m:53394611?types=bldg,tran',
     );
   });
+
+  it('大きさが載っていないファイル（金沢市 2024 など）は 0（不明）にする', () => {
+    const json = { cities: [{ cityCode: '17201', cityName: '金沢市', year: 2024, files: { bldg: [{ code: '54366591', url: 'https://x/54366591_bldg_6697_op.gml' }] } }] };
+    const [f] = parseCatalog(json, '54366591', ['bldg']);
+    expect(f!.fileSize).toBe(0);
+  });
 });

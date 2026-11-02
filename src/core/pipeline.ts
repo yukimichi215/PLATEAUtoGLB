@@ -9,6 +9,7 @@ import { SceneBuilder, type BuildingInfo } from './scene.js';
 
 export const MIN_SIZE = 50;
 export const MAX_SIZE = 1000;
+const UNKNOWN_SIZE_GUESS = 20e6;
 
 export interface AreaRequest {
   center: LatLon;
@@ -25,8 +26,10 @@ export interface AreaPlan {
   request: AreaRequest;
   meshes: string[];
   files: SourceFile[];
-  /** 読む必要のあるデータの合計（展開後のバイト数） */
+  /** 読む必要のあるデータの合計（展開後のバイト数。大きさが分からないファイルは含まない） */
   totalBytes: number;
+  /** 大きさが分からないファイルの数（データカタログに大きさが載っていないことがある） */
+  unknownSizeFiles: number;
 }
 
 export function validateRequest(req: AreaRequest): void {
@@ -46,7 +49,8 @@ export async function planArea(req: AreaRequest, fetchJson: FetchJson): Promise<
   const types: FeatureType[] = req.includeRoads ? ['bldg', 'tran'] : ['bldg'];
   const files = await findSourceFiles(meshes, types, fetchJson);
   const totalBytes = files.reduce((s, f) => s + f.fileSize, 0);
-  return { request: req, meshes, files, totalBytes };
+  const unknownSizeFiles = files.filter((f) => !(f.fileSize > 0)).length;
+  return { request: req, meshes, files, totalBytes, unknownSizeFiles };
 }
 
 /** ファイルの中身を文字列の流れとして開く。読んだバイト数を onBytes で知らせる */
@@ -103,7 +107,9 @@ export async function generateFromPlan(
   const scene = new SceneBuilder({ projector, half: req.size / 2, lod: req.lod });
   const used: UsedFile[] = [];
 
-  const total = Math.max(1, plan.totalBytes);
+  // 進み具合の重み。大きさが分からないファイルは仮に 20MB とみなす
+  const weightOf = (f: SourceFile) => (f.fileSize > 0 ? f.fileSize : UNKNOWN_SIZE_GUESS);
+  const total = Math.max(1, plan.files.reduce((s, f) => s + weightOf(f), 0));
   let doneBytes = 0;
   for (const [i, file] of plan.files.entries()) {
     const label = `${i + 1}/${plan.files.length} ${file.type === 'bldg' ? '建物' : '道路'}データ（メッシュ ${file.mesh}）`;
@@ -114,8 +120,8 @@ export async function generateFromPlan(
     const chunks = await openText(file, (n) => {
       fileBytes += n;
       onProgress({
-        ratio: Math.min(1, (doneBytes + Math.min(fileBytes, file.fileSize)) / total),
-        message: `${label} を読み込み中… ${(fileBytes / 1e6).toFixed(0)} / ${(file.fileSize / 1e6).toFixed(0)} MB`,
+        ratio: Math.min(1, (doneBytes + Math.min(fileBytes, weightOf(file))) / total),
+        message: `${label} を読み込み中… ${(fileBytes / 1e6).toFixed(0)} / ${file.fileSize > 0 ? (file.fileSize / 1e6).toFixed(0) : '?'} MB`,
       });
     });
     await readCityGml(chunks, {
@@ -129,7 +135,7 @@ export async function generateFromPlan(
         if (scene.addRoad(r)) count++;
       },
     });
-    doneBytes += file.fileSize;
+    doneBytes += weightOf(file);
     if (count > 0) used.push({ file, cityCodes });
   }
 

@@ -39,7 +39,7 @@ function plan(req: Partial<AreaRequest> = {}): AreaPlan {
     ...req,
   };
   const files = request.includeRoads ? [fakeFile('bldg'), fakeFile('tran')] : [fakeFile('bldg')];
-  return { request, meshes: ['53394611'], files, totalBytes: 1000 * files.length };
+  return { request, meshes: ["53394611"], files, totalBytes: 1000 * files.length, unknownSizeFiles: 0 };
 }
 
 /** 元データでの、建物ごとの高さ（いちばん高い点 − いちばん低い点）の最大 */

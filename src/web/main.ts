@@ -1,6 +1,7 @@
 // 画面の操作。重い処理は worker.ts に任せる。
 import { searchPlace, type Place } from '../core/geocode.js';
 import type { AreaPlan, AreaRequest } from '../core/pipeline.js';
+import { isDesktop, saveWithDialog } from './desktop.js';
 import { Preview } from './preview.js';
 import type { WorkerRequest, WorkerResponse } from './worker.js';
 
@@ -33,6 +34,8 @@ let selected: Place | null = null;
 let busy = false;
 let preview: Preview | null = null;
 const objectUrls: string[] = [];
+/** デスクトップ版で保存するための、できあがったファイルの中身 */
+let lastFiles: { glb: { name: string; data: Uint8Array }; credit: { name: string; data: Uint8Array } } | null = null;
 
 const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });
 
@@ -157,9 +160,10 @@ makeBtn.addEventListener('click', async () => {
     if (plan.files.every((f) => f.type !== 'bldg')) {
       throw new Error('この場所には PLATEAU の建物データがありません（まだ整備されていない地域の可能性があります）。');
     }
+    const unknown = toDownload.filter((f) => !(f.fileSize > 0)).length;
     if (dlBytes > CONFIRM_MB * 1e6) {
       const ok = window.confirm(
-        `この場所のデータは約 ${mb(dlBytes)} あります（通信は圧縮されるので、実際の通信量はこの1〜2割程度です）。\n読み込みに時間がかかることがあります。続けますか？`,
+        `この場所のデータは約 ${mb(dlBytes)}${unknown > 0 ? `＋大きさ不明のファイル ${unknown} 件` : ''} あります（通信は圧縮されるので、実際の通信量はこの1〜2割程度です）。\n読み込みに時間がかかることがあります。続けますか？`,
       );
       if (!ok) {
         progressEl.hidden = true;
@@ -180,6 +184,10 @@ makeBtn.addEventListener('click', async () => {
     dlGlb.download = `${res.fileName}.glb`;
     dlCredit.href = creditUrl;
     dlCredit.download = `${res.fileName}_credit.txt`;
+    lastFiles = {
+      glb: { name: dlGlb.download, data: new Uint8Array(res.glb.slice(0)) },
+      credit: { name: dlCredit.download, data: new TextEncoder().encode(res.credit) },
+    };
     creditEl.textContent = res.credit;
 
     const s = res.stats;
@@ -200,6 +208,24 @@ makeBtn.addEventListener('click', async () => {
     setBusy(false);
   }
 });
+
+// デスクトップ版では、ダウンロードの代わりに「名前を付けて保存」の窓で保存する
+for (const [link, key] of [
+  [dlGlb, 'glb'],
+  [dlCredit, 'credit'],
+] as const) {
+  link.addEventListener('click', async (ev) => {
+    if (!isDesktop() || !lastFiles) return;
+    ev.preventDefault();
+    const f = lastFiles[key];
+    try {
+      const saved = await saveWithDialog(f.name, f.data);
+      if (saved) showMessage(`${f.name} を保存しました。`);
+    } catch (e) {
+      showMessage(`保存できませんでした：${e instanceof Error ? e.message : String(e)}`, true);
+    }
+  });
+}
 
 clearCacheBtn.addEventListener('click', async () => {
   await call({ type: 'clearCache' });

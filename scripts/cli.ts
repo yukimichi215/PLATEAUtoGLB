@@ -1,8 +1,8 @@
 // コマンドで GLB を作る（開発・確認用）。取得したデータは data/cache/ に保存して使い回す。
 // 例：npm run cli -- --lat 35.6812 --lon 139.7671 --size 300 --lod 1 --name 東京駅
-import { createReadStream, createWriteStream, existsSync, mkdirSync, renameSync, writeFileSync } from 'node:fs';
+import { createReadStream, createWriteStream, existsSync, mkdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { Readable } from 'node:stream';
+import { Readable, Transform } from 'node:stream';
 import { pipeline as streamPipeline } from 'node:stream/promises';
 import { parseArgs } from 'node:util';
 import type { SourceFile } from '../src/core/catalog.js';
@@ -46,12 +46,27 @@ const openText: OpenText = async (file: SourceFile, onBytes) => {
     // 前回の取得から3秒以上あける（相手の負荷を抑える）
     const wait = lastDownload + 3000 - Date.now();
     if (wait > 0) await sleep(wait);
-    console.error(`取得: ${file.url}（約 ${(file.fileSize / 1e6).toFixed(0)} MB）`);
+    console.error(`取得: ${file.url}（${file.fileSize > 0 ? `約 ${(file.fileSize / 1e6).toFixed(0)} MB` : '大きさ不明'}）`);
     const res = await fetch(file.url, { signal: AbortSignal.timeout(600_000) });
     lastDownload = Date.now();
     if (!res.ok || !res.body) throw new Error(`取得に失敗しました（${res.status}）。取得を中止します。`);
     const tmp = `${path}.part`;
-    await streamPipeline(Readable.fromWeb(res.body as never), createWriteStream(tmp));
+    // 大きさが分からないファイルもあるので、取得しながら上限を確かめ、超えたら止めて消す
+    const limit = Number(values['max-file-mb']) * 1e6;
+    let got = 0;
+    const counter = new Transform({
+      transform(chunk: Buffer, _enc, cb) {
+        got += chunk.length;
+        if (got > limit) cb(new Error(`1ファイル ${values['max-file-mb']} MB を超えたため取得を中止しました`));
+        else cb(null, chunk);
+      },
+    });
+    try {
+      await streamPipeline(Readable.fromWeb(res.body as never), counter, createWriteStream(tmp));
+    } catch (e) {
+      rmSync(tmp, { force: true });
+      throw e;
+    }
     renameSync(tmp, path);
   }
   const stream = createReadStream(path, { encoding: 'utf8', highWaterMark: 1 << 20 });
@@ -77,7 +92,7 @@ const t0 = Date.now();
 const plan = await planArea(req, defaultFetchJson);
 console.error(`メッシュ: ${plan.meshes.join(', ')}`);
 for (const f of plan.files) {
-  console.error(`  ${f.type} ${f.mesh} ${(f.fileSize / 1e6).toFixed(1)} MB ${f.cities.map((c) => c.name).join('/')}`);
+  console.error(`  ${f.type} ${f.mesh} ${f.fileSize > 0 ? `${(f.fileSize / 1e6).toFixed(1)} MB` : '大きさ不明'} ${f.cities.map((c) => c.name).join('/')}`);
 }
 if (plan.totalBytes > Number(values['max-mb']) * 1e6) {
   console.error(`合計 ${(plan.totalBytes / 1e6).toFixed(0)} MB が上限を超えるため中止します（--max-mb で変更）`);
