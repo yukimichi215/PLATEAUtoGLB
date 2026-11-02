@@ -23,4 +23,15 @@ describe('場所の検索', () => {
     expect(places).toHaveLength(2);
     expect(places[0]).toEqual({ lat: 35.6814, lon: 139.7643, title: '東京都千代田区丸の内一丁目' });
   });
+
+  it('駅名では、入力の地名を含む候補を先に出す', async () => {
+    const f = (title: string, lon: number, lat: number) => ({ geometry: { coordinates: [lon, lat] }, properties: { title } });
+    const places = await searchPlace('東京駅', async () => [
+      f('北海道札幌市東区', 141.36, 43.07),
+      f('北海道東神楽町東', 142.43, 43.68),
+      f('東京都千代田区丸の内一丁目', 139.7672, 35.6816),
+    ]);
+    expect(places[0]!.title).toBe('東京都千代田区丸の内一丁目');
+    expect(places).toHaveLength(3);
+  });
 });
