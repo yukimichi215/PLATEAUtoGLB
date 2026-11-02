@@ -1,0 +1,36 @@
+{
+  "name": "plateau-to-glb",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PLATEAU の3D都市モデルから、住所の周りの建物を PlotBlock 用の GLB にするツール",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "cli": "tsx scripts/cli.ts",
+    "verify": "tsx scripts/verify-glb.ts",
+    "app:dev": "tauri dev",
+    "app:build": "tauri build --no-bundle"
+  },
+  "dependencies": {
+    "@gltf-transform/core": "^4.5.1",
+    "@tauri-apps/api": "2.11.1",
+    "earcut": "^3.2.4",
+    "sax": "^1.6.1",
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.11.5",
+    "@types/node": "^26.6.5",
+    "@types/sax": "^1.2.7",
+    "@types/three": "^0.186.0",
+    "gltf-validator": "^2.0.0-dev.3.10",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.4",
+    "vitest": "^5.0.4"
+  }
+}
