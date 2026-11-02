@@ -23,7 +23,18 @@
 
 まだできないこと：地形（坂・高低差。建物は地面の高さ 0 にそろえて並べる）、橋・木など、建物の模様、地図で場所を選ぶこと。
 
-## 使い方（今のところ、パソコンに Node.js が必要です）
+## 使い方
+
+### Windows アプリ版（おすすめ）
+
+`PLATEAUtoGLB.exe` をダブルクリックすると起動します（インストール不要。Windows 10/11 64ビット・インターネット接続が必要）。
+
+exe は、main に取り込まれたときに GitHub の自動ビルドが作ります。
+GitHub のリポジトリの「Actions」→ いちばん新しい「build」→ 下の「Artifacts」の `PLATEAUtoGLB-windows` からダウンロードできます
+（保存は最新の1つだけ・7日間。消えていたら、main に変更が入ったときに作り直されます）。
+署名のないアプリなので、初回は「Windows によって PC が保護されました」と出ることがあります（「詳細情報」→「実行」）。
+
+### ブラウザ版（開発用。パソコンに Node.js が必要）
 
 ```sh
 npm ci --ignore-scripts
@@ -32,7 +43,7 @@ npm run dev
 
 表示された `http://localhost:5173/` をブラウザで開きます。
 
-一度取った PLATEAU のデータはブラウザに保存して使い回します（画面の一番下のリンクで消せます）。
+一度取った PLATEAU のデータは手元（アプリ・ブラウザの保存領域）に保存して使い回します（画面の一番下のリンクで消せます）。
 東京の中心部などでは、1km 四方のデータが展開後 100〜200MB 程度あります（通信は圧縮されるので 1〜2 割程度）。
 
 ## データと出典
@@ -53,6 +64,7 @@ npm run dev
 | `npm test` | 自動テスト（`tests/`。小さな見本データ `tests/fixtures/` を使い、glTF Validator と three.js の GLTFLoader で GLB を検査） |
 | `npm run build` | 型チェックと公開用のファイル作成（`dist/`） |
 | `npm run cli -- --lat 35.6812 --lon 139.7671 --size 300 --lod 1 --name 東京駅` | コマンドで GLB を作る（取得したデータは `data/cache/` に保存。1ファイル200MB・合計1000MBを超えると中止） |
+| `npm run app:dev` / `npm run app:build` | Windows アプリ版の起動・ビルド（Rust と Tauri の準備が要る。通常は GitHub の自動ビルドで作る） |
 | `npm run verify -- out/xxx.glb` | GLB を glTF Validator と three.js で検査し、外形・三角形の数を表示 |
 
 PR を出す前の検証：`npm run typecheck`、`npm test`、`npm run build` がすべて通ること。
@@ -63,3 +75,7 @@ GLB の出力を変えたときは、さらに実データで `npm run cli` と 
 - `src/core/` … 画面とコマンドで共通の中身（場所→メッシュ番号、データカタログ、CityGML の読み取り、三角形分割、GLB 作成、出典）
 - `src/web/` … ブラウザの画面。重い処理は Web Worker（`worker.ts`）で行う
 - `scripts/` … コマンド（GLB 作成・検査）
+- `src-tauri/` … Windows アプリ版（Tauri）。画面は `dist/` をそのまま使い、保存だけ「名前を付けて保存」の窓（`save_file`）にする
+- `.github/workflows/build.yml` … 自動ビルド。PR では検査とビルドの確認だけ、main では exe を作って最新の1つだけ保存
+
+自動ビルド：PR では「検査（型チェック・テスト・画面のビルド）」と「Windows 版（exe）」が通ることを確かめる。
