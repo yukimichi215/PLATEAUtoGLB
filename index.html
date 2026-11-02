@@ -29,7 +29,9 @@
         <div class="grid">
           <label>切り出す広さ（正方形の一辺）
             <select id="size">
+              <option value="50">50 m（建物数棟）</option>
               <option value="100">100 m</option>
+              <option value="150">150 m</option>
               <option value="200">200 m</option>
               <option value="300" selected>300 m</option>
               <option value="500">500 m</option>
@@ -37,9 +39,14 @@
             </select>
           </label>
           <fieldset>
-            <legend>建物の形</legend>
-            <label class="inline"><input type="radio" name="lod" value="1" checked /> 箱型（いちばん軽い・おすすめ）</label>
-            <label class="inline"><input type="radio" name="lod" value="2" /> 屋根の形あり（少し重い）</label>
+            <legend>建物の細かさ</legend>
+            <label class="inline"><input type="radio" name="detail" value="box" checked /> 箱型（いちばん軽い）</label>
+            <label class="inline"><input type="radio" name="detail" value="roof" /> 屋根の形あり</label>
+            <label class="inline"><input type="radio" name="detail" value="roofPlus" /> 屋根の形＋付属物（重い）</label>
+          </fieldset>
+          <fieldset>
+            <legend>見た目</legend>
+            <label class="inline"><input type="checkbox" id="windows" /> 壁に窓の模様を付ける</label>
           </fieldset>
           <fieldset>
             <legend>建物以外</legend>
@@ -47,6 +54,11 @@
             <label class="inline"><input type="checkbox" id="ground" checked /> 地面の板</label>
           </fieldset>
         </div>
+        <p class="hint">
+          下ほど細かく、ファイルが大きくなります。スマホ向けには「箱型」がおすすめです。
+          付属物はベランダ・ひさし・屋上の設備などで、データのない地域もあります。
+          窓の模様は階数をもとに自動で描く見た目用のもので、本物の窓の位置ではありません（ファイルはほとんど大きくなりません）。
+        </p>
         <p class="hint">中心が範囲の中にある建物を入れます。大きな建物は範囲から少しはみ出すことがあります。地形（坂や高低差）はまだ入りません。</p>
       </section>
 
