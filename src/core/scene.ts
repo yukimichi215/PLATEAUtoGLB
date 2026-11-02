@@ -55,7 +55,7 @@ export interface BuildingInfo {
 }
 
 /** 道路を地面よりわずかに上に置く高さ（m）。地面とちらつかないため */
-export const ROAD_HEIGHT = 0.05;
+export const ROAD_HEIGHT = 0.15;
 
 export class SceneBuilder {
   readonly parts: Record<PartName, MeshPart> = {
