@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PLATEAUtoGLB</title>
+    <link rel="stylesheet" href="/src/web/style.css" />
+  </head>
+  <body>
+    <header class="top">
+      <h1>PLATEAUtoGLB</h1>
+      <p class="lead">住所や地名から、その周りの建物を PlotBlock で使える GLB ファイルにします（データ：国土交通省 PLATEAU）。</p>
+    </header>
+
+    <main>
+      <section class="card" aria-labelledby="h-place">
+        <h2 id="h-place"><span class="step">1</span>場所を探す</h2>
+        <form id="search-form" class="row">
+          <input id="search-input" type="search" placeholder="例：東京駅、大阪市北区梅田、35.6812, 139.7671" autocomplete="off" required />
+          <button type="submit" id="search-btn">検索</button>
+        </form>
+        <p class="hint">住所・地名・駅名のほか、「緯度, 経度」でも指定できます。</p>
+        <ul id="candidates" class="candidates" hidden></ul>
+        <p id="place" class="place" hidden></p>
+      </section>
+
+      <section class="card" aria-labelledby="h-settings">
+        <h2 id="h-settings"><span class="step">2</span>切り出し方を選ぶ</h2>
+        <div class="grid">
+          <label>切り出す広さ（正方形の一辺）
+            <select id="size">
+              <option value="100">100 m</option>
+              <option value="200">200 m</option>
+              <option value="300" selected>300 m</option>
+              <option value="500">500 m</option>
+              <option value="1000">1000 m（重い）</option>
+            </select>
+          </label>
+          <fieldset>
+            <legend>建物の形</legend>
+            <label class="inline"><input type="radio" name="lod" value="1" checked /> 箱型（いちばん軽い・おすすめ）</label>
+            <label class="inline"><input type="radio" name="lod" value="2" /> 屋根の形あり（少し重い）</label>
+          </fieldset>
+          <fieldset>
+            <legend>建物以外</legend>
+            <label class="inline"><input type="checkbox" id="roads" checked /> 道路</label>
+            <label class="inline"><input type="checkbox" id="ground" checked /> 地面の板</label>
+          </fieldset>
+        </div>
+        <p class="hint">中心が範囲の中にある建物を入れます。大きな建物は範囲から少しはみ出すことがあります。地形（坂や高低差）はまだ入りません。</p>
+      </section>
+
+      <section class="card" aria-labelledby="h-make">
+        <h2 id="h-make"><span class="step">3</span>GLB を作る</h2>
+        <button id="make-btn" class="primary" disabled>GLB を作る</button>
+        <div id="progress" class="progress" hidden>
+          <div class="bar"><div id="progress-fill"></div></div>
+          <p id="progress-text"></p>
+        </div>
+        <p id="message" class="message" role="status"></p>
+      </section>
+
+      <section id="result" class="card" aria-labelledby="h-result" hidden>
+        <h2 id="h-result"><span class="step">4</span>できあがり</h2>
+        <div id="preview" class="preview" aria-label="3D プレビュー（ドラッグで回転・ホイールで拡大）"></div>
+        <p class="hint">ドラッグで回転、ホイール（2本指）で拡大・縮小できます。</p>
+        <dl id="stats" class="stats"></dl>
+        <div class="row">
+          <a id="dl-glb" class="button primary" download>GLB をダウンロード</a>
+          <a id="dl-credit" class="button" download>クレジット（出典）をダウンロード</a>
+        </div>
+        <details>
+          <summary>クレジットの文章（PlotBlock の素材のクレジット欄に貼り付けてください）</summary>
+          <pre id="credit"></pre>
+        </details>
+      </section>
+    </main>
+
+    <footer>
+      <p>
+        建物・道路のデータは国土交通省 Project PLATEAU の3D都市モデル（各自治体が著作権を保有）を加工したものです。
+        このツールは国土交通省・自治体のものではありません。住所の検索には国土地理院の住所検索を使っています。
+      </p>
+      <p><button id="clear-cache" class="link">このブラウザに保存した PLATEAU データを消す</button></p>
+    </footer>
+    <script type="module" src="/src/web/main.ts"></script>
+  </body>
+</html>
