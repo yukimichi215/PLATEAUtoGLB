@@ -15,8 +15,9 @@ export interface AreaRequest {
   center: LatLon;
   /** 切り出す正方形の一辺（m） */
   size: number;
-  lod: 1 | 2;
-  /** ベランダ・ひさし・屋上の設備などの付属物を入れる（屋根の形あり〔LOD2〕のときだけ） */
+  /** 1 = 箱型、2 = 屋根の形あり、3 = 窓・扉まで（試作。LOD3 のない建物は LOD2 → LOD1 で代用） */
+  lod: 1 | 2 | 3;
+  /** ベランダ・ひさし・屋上の設備などの付属物を入れる（LOD2・LOD3 のとき） */
   installations?: boolean;
   includeRoads: boolean;
   includeGround: boolean;
@@ -77,6 +78,8 @@ export interface GenerateStats {
   skippedBuildings: number;
   /** 付属物（ベランダなど）を入れた建物の数 */
   buildingsWithInstallations: number;
+  /** 窓・扉まである形（LOD3）で入れた建物の数 */
+  lod3Buildings: number;
 }
 
 export interface GenerateResult {
@@ -91,11 +94,15 @@ export interface GenerateResult {
 /** 建物の細かさの名前（記録・出典の説明用） */
 export function detailLabel(req: AreaRequest): string {
   if (req.lod === 1) return '箱型（LOD1）';
+  if (req.lod === 3) {
+    return `窓・扉まである形（LOD3。LOD3 のない建物は屋根の形〔LOD2〕で代用${req.installations ? '、付属物あり' : ''}）`;
+  }
   return req.installations ? '屋根の形とベランダなどの付属物あり（LOD2）' : '屋根の形あり（LOD2）';
 }
 
 /** ファイル名に付ける細かさの印 */
 function detailCode(req: AreaRequest): string {
+  if (req.lod === 3) return req.installations ? 'lod3plus' : 'lod3';
   return req.lod === 1 ? 'lod1' : req.installations ? 'lod2plus' : 'lod2';
 }
 
@@ -123,7 +130,7 @@ export async function generateFromPlan(
     projector,
     half: req.size / 2,
     lod: req.lod,
-    installations: req.lod === 2 && req.installations === true,
+    installations: req.lod >= 2 && req.installations === true,
   });
   const used: UsedFile[] = [];
 
@@ -190,7 +197,7 @@ export async function generateFromPlan(
         centerLon: req.center.lon,
         sizeMeters: req.size,
         lod: req.lod,
-        installations: req.lod === 2 && req.installations === true,
+        installations: req.lod >= 2 && req.installations === true,
         origin: '範囲の中心・地面の高さ0。単位はメートル、+Y が上、-Z が北',
       },
       createdAt,
@@ -231,6 +238,7 @@ export async function generateFromPlan(
       height: r1(maxY - minY),
       skippedBuildings: scene.skippedBuildings,
       buildingsWithInstallations: scene.buildingsWithInstallations,
+      lod3Buildings: scene.lod3Buildings,
     },
   };
 }

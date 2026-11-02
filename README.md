@@ -24,6 +24,8 @@
 
 まだできないこと：地形（坂・高低差。建物は地面の高さ 0 にそろえて並べる）、橋・木など、建物の模様・窓（PLATEAU の写真の模様は一部の地域にしかなく粗いため使わない。窓の形のデータはほぼない）、地図で場所を選ぶこと。
 
+試作：窓・扉まである形（LOD3）は、コマンドの `--lod 3` だけで試せます（画面にはまだ出していません）。LOD3 は沼津駅前・虎ノ門など一部の地域のごく一部の建物にしかなく、LOD3 のない建物は屋根の形（LOD2）→箱型（LOD1）で代用します。窓は青、扉は茶色の部品になります。
+
 ## 使い方
 
 ### Windows アプリ版（おすすめ）
@@ -64,7 +66,7 @@ npm run dev
 | `npm run typecheck` | 型チェック |
 | `npm test` | 自動テスト（`tests/`。小さな見本データ `tests/fixtures/` を使い、glTF Validator と three.js の GLTFLoader で GLB を検査） |
 | `npm run build` | 型チェックと公開用のファイル作成（`dist/`） |
-| `npm run cli -- --lat 35.6812 --lon 139.7671 --size 300 --lod 1 --name 東京駅` | コマンドで GLB を作る（`--lod 2 --installations` で付属物）（取得したデータは `data/cache/` に保存。1ファイル200MB・合計1000MBを超えると中止） |
+| `npm run cli -- --lat 35.6812 --lon 139.7671 --size 300 --lod 1 --name 東京駅` | コマンドで GLB を作る（`--lod 2 --installations` で付属物、`--lod 3` で窓・扉〔試作〕）（取得したデータは `data/cache/` に保存。1ファイル200MB・合計1000MBを超えると中止） |
 | `npm run app:dev` / `npm run app:build` | Windows アプリ版の起動・ビルド（Rust と Tauri の準備が要る。通常は GitHub の自動ビルドで作る） |
 | `npm run verify -- out/xxx.glb` | GLB を glTF Validator と three.js で検査し、外形・三角形の数を表示 |
 

@@ -109,6 +109,53 @@ describe('GLB を作る流れ（テスト用の小さなデータ）', () => {
     expect(b.credit).toContain('付属物');
   });
 
+  it('LOD3 を選んでも、LOD3 のない建物は屋根の形（LOD2）で入れる', async () => {
+    const a = await generateFromPlan(plan({ lod: 2, includeRoads: false, includeGround: false }), openText);
+    const b = await generateFromPlan(plan({ lod: 3, includeRoads: false, includeGround: false }), openText);
+    expect(b.stats.lod3Buildings).toBe(0);
+    expect(b.stats.triangles).toBe(a.stats.triangles);
+    expect(b.fileName).toContain('lod3');
+  });
+
+  it('LOD3：窓・扉の部品ができ、Validator のエラー0件・three.js で読める・高さが元データと合う', async () => {
+    const numazu: AreaPlan = {
+      request: {
+        center: { lat: 35.10125, lon: 138.8592 },
+        size: 100,
+        lod: 3,
+        installations: true,
+        includeRoads: false,
+        includeGround: false,
+        placeName: '沼津駅前',
+      },
+      meshes: ['52385628'],
+      files: [
+        {
+          type: 'bldg',
+          mesh: '52385628',
+          url: 'https://assets.cms.plateau.reearth.io/test/22203/udx/bldg/52385628_bldg_6697_op.gml',
+          fileSize: 1000,
+          maxLod: 3,
+          cities: [{ code: '22203', name: '沼津市', year: 2023, url: 'https://assets.cms.plateau.reearth.io/test/22203/bldg.gml' }],
+        },
+      ],
+      totalBytes: 1000,
+      unknownSizeFiles: 0,
+    };
+    const open: OpenText = async () =>
+      createReadStream(new URL('./fixtures/bldg_numazu_lod3.gml', import.meta.url), { encoding: 'utf8' }) as AsyncIterable<string>;
+    const lod3 = await generateFromPlan(numazu, open);
+    expect(lod3.stats.buildings).toBe(2);
+    expect(lod3.stats.lod3Buildings).toBe(2);
+    const check = await checkGlb(lod3.glb);
+    expect(check.validatorErrors).toBe(0);
+    expect(check.loadedByThree).toBe(true);
+    // 元データの高さ（measuredHeight 12.8m・9.5m）と、いちばん高い建物の高さがおおむね合う
+    expect(Math.abs(lod3.stats.height - 12.8)).toBeLessThan(1.5);
+    const lod2 = await generateFromPlan({ ...numazu, request: { ...numazu.request, lod: 2 } }, open);
+    expect(lod3.stats.triangles).toBeGreaterThan(lod2.stats.triangles);
+  });
+
   it('範囲の外の建物は入れない', async () => {
     // 東京駅から約1km東
     await expect(

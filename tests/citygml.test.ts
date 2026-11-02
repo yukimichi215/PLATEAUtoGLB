@@ -47,6 +47,46 @@ describe('CityGML の読み取り', () => {
     expect(got[0]!.attrs.storeysAboveGround).toBe(3);
   });
 
+  it('LOD3（窓・扉まである形）を読む：窓・扉は種類を分け、窓の名前は建物の名前にしない', async () => {
+    const list: Building[] = [];
+    await readCityGml(fixture('bldg_numazu_lod3.gml'), { onBuilding: (b) => list.push(b) });
+    expect(list).toHaveLength(2);
+    for (const b of list) {
+      expect(b.lod3.length).toBeGreaterThan(0);
+      expect(b.lod2.length).toBeGreaterThan(0); // LOD2 も別に持つ
+      expect(b.attrs.city).toBe('22203');
+      expect(b.attrs.name).toBeUndefined();
+    }
+    const count = (kind: string) => list.reduce((n, b) => n + b.lod3.filter((s) => s.kind === kind).length, 0);
+    expect(count('window')).toBeGreaterThan(0);
+    expect(count('door')).toBeGreaterThan(0);
+    expect(count('wall')).toBeGreaterThan(0);
+    expect(count('roof')).toBeGreaterThan(0);
+  });
+
+  it('LOD3 の付属物は LOD2 の付属物と分けて読む', () => {
+    const ring = (h: number) =>
+      `<gml:Polygon><gml:exterior><gml:LinearRing><gml:posList>35.68 139.76 ${h} 35.6801 139.76 ${h} 35.6801 139.7601 ${h} 35.68 139.76 ${h}</gml:posList></gml:LinearRing></gml:exterior></gml:Polygon>`;
+    const xml = `<core:CityModel><core:cityObjectMember><bldg:Building gml:id="b1">
+<bldg:boundedBy><bldg:WallSurface><bldg:lod3MultiSurface><gml:MultiSurface><gml:surfaceMember>${ring(1)}</gml:surfaceMember></gml:MultiSurface></bldg:lod3MultiSurface>
+<bldg:opening><bldg:Window gml:id="w1"><gml:name>窓</gml:name><bldg:lod3MultiSurface><gml:MultiSurface><gml:surfaceMember>${ring(2)}</gml:surfaceMember></gml:MultiSurface></bldg:lod3MultiSurface></bldg:Window></bldg:opening>
+</bldg:WallSurface></bldg:boundedBy>
+<bldg:outerBuildingInstallation><bldg:BuildingInstallation gml:id="i1">
+<bldg:lod2Geometry><gml:MultiSurface><gml:surfaceMember>${ring(5)}</gml:surfaceMember></gml:MultiSurface></bldg:lod2Geometry>
+<bldg:lod3Geometry><gml:MultiSurface><gml:surfaceMember>${ring(6)}</gml:surfaceMember><gml:surfaceMember>${ring(7)}</gml:surfaceMember></gml:MultiSurface></bldg:lod3Geometry>
+</bldg:BuildingInstallation></bldg:outerBuildingInstallation>
+</bldg:Building></core:cityObjectMember></core:CityModel>`;
+    const got: Building[] = [];
+    const reader = new CityGmlReader({ onBuilding: (b) => got.push(b) });
+    reader.feed(xml);
+    reader.close();
+    const b = got[0]!;
+    expect(b.lod3.map((s) => s.kind)).toEqual(['wall', 'window']);
+    expect(b.installations).toHaveLength(1);
+    expect(b.installations3).toHaveLength(2);
+    expect(b.attrs.name).toBeUndefined();
+  });
+
   it('道路を読む', async () => {
     const roads: Road[] = [];
     await readCityGml(fixture('tran_sample.gml'), { onRoad: (r) => roads.push(r) });

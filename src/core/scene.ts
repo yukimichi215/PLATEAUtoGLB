@@ -1,9 +1,9 @@
 // 建物・道路を、切り出した範囲の中心を原点にした三角形の集まりにする。
-import type { Building, Polygon, Road, SurfaceKind } from './citygml.js';
+import type { Building, Lod3Kind, Polygon, Road } from './citygml.js';
 import { LocalProjector } from './geo.js';
 import { clipRingToSquare, triangulatePolygon } from './geometry.js';
 
-export type PartName = 'wall' | 'roof' | 'detail' | 'road' | 'ground';
+export type PartName = 'wall' | 'roof' | 'detail' | 'window' | 'door' | 'road' | 'ground';
 
 /** 1種類の材質で描く三角形の集まり。法線は面ごと（角ばったローポリの見た目） */
 export class MeshPart {
@@ -32,9 +32,9 @@ export interface SceneOptions {
   projector: LocalProjector;
   /** 切り出す正方形の一辺の半分（m） */
   half: number;
-  /** 1 = 箱型（軽い）、2 = 屋根の形あり */
-  lod: 1 | 2;
-  /** ベランダなどの付属物を入れる（LOD2 のときだけ） */
+  /** 1 = 箱型（軽い）、2 = 屋根の形あり、3 = 窓・扉まで（試作。LOD3 のない建物は LOD2 → LOD1 で代用） */
+  lod: 1 | 2 | 3;
+  /** ベランダなどの付属物を入れる（LOD2・LOD3 のとき） */
   installations?: boolean;
 }
 
@@ -52,9 +52,42 @@ export interface BuildingInfo {
   /** 中心から見た位置（m） */
   x: number;
   z: number;
-  lodUsed: 1 | 2;
+  lodUsed: 1 | 2 | 3;
   /** 入れた付属物の面の数 */
   installationFaces: number;
+}
+
+/** 窓・扉を壁から外側へ浮かせる距離（m） */
+export const OPENING_OFFSET = 0.04;
+
+/**
+ * 面を、建物の中心から離れる向き（水平方向）へ距離 d だけ動かす。
+ * 元データの面の表裏の向きはそろっていないことがあるので、法線の向きではなく建物の中心を基準にする。
+ */
+function offsetOutward(positions: number[], normal: [number, number, number], bx: number, bz: number, d: number): void {
+  let nx = normal[0];
+  let nz = normal[2];
+  const len = Math.hypot(nx, nz);
+  if (len < 0.3) return; // ほぼ水平な面（天窓など）は動かさない
+  nx /= len;
+  nz /= len;
+  let fx = 0;
+  let fz = 0;
+  const n = positions.length / 3;
+  for (let i = 0; i < positions.length; i += 3) {
+    fx += positions[i]!;
+    fz += positions[i + 2]!;
+  }
+  fx = fx / n - bx;
+  fz = fz / n - bz;
+  if (fx * nx + fz * nz < 0) {
+    nx = -nx;
+    nz = -nz;
+  }
+  for (let i = 0; i < positions.length; i += 3) {
+    positions[i]! += nx * d;
+    positions[i + 2]! += nz * d;
+  }
 }
 
 /** 道路を地面よりわずかに上に置く高さ（m）。地面とちらつかないため */
@@ -71,12 +104,16 @@ export class SceneBuilder {
 
   /** 付属物を入れた建物の数 */
   buildingsWithInstallations = 0;
+  /** 窓・扉まである形（LOD3）で入れた建物の数 */
+  lod3Buildings = 0;
 
   constructor(private readonly opt: SceneOptions) {
     this.parts = {
       wall: new MeshPart(),
       roof: new MeshPart(),
       detail: new MeshPart(),
+      window: new MeshPart(),
+      door: new MeshPart(),
       road: new MeshPart(),
       ground: new MeshPart(),
     };
@@ -115,10 +152,13 @@ export class SceneBuilder {
     if (Math.abs(cx) > this.opt.half || Math.abs(cz) > this.opt.half) return false;
     this.seen.add(b.id);
 
-    const useLod2 = this.opt.lod === 2 && b.lod2.length > 0;
-    const surfaces: { kind: SurfaceKind; polygon: Polygon }[] = useLod2
-      ? b.lod2
-      : b.lod1.map((polygon) => ({ kind: 'other' as SurfaceKind, polygon }));
+    const useLod3 = this.opt.lod === 3 && b.lod3.length > 0;
+    const useLod2 = !useLod3 && this.opt.lod >= 2 && b.lod2.length > 0;
+    const surfaces: { kind: Lod3Kind; polygon: Polygon }[] = useLod3
+      ? b.lod3
+      : useLod2
+        ? b.lod2
+        : b.lod1.map((polygon) => ({ kind: 'other' as Lod3Kind, polygon }));
 
     // 地面（建物のいちばん低い点）を高さ 0 にそろえる。地形はまだ入れないので、坂の町でも平らに並べる
     const local = surfaces.map((s) => ({
@@ -136,6 +176,8 @@ export class SceneBuilder {
     }
     if (!Number.isFinite(minY)) return false;
 
+    // 建物の中心（ローカル座標）。窓・扉を外側へ少し浮かせる向きを決めるのに使う
+    const [bx, bz] = [cx, cz];
     let added = 0;
     for (const s of local) {
       // 底の面は見えないので入れない（三角形を減らす）
@@ -144,6 +186,13 @@ export class SceneBuilder {
       for (const r of s.interiors) for (let i = 1; i < r.length; i += 3) r[i]! -= minY;
       const tri = triangulatePolygon(s.exterior, s.interiors);
       if (!tri) continue;
+      if (s.kind === 'window' || s.kind === 'door') {
+        // 窓・扉は壁と同じ面に重なっていることが多く、そのままだとちらつくので外側へ少し浮かせる
+        offsetOutward(tri.positions, tri.normal, bx, bz, OPENING_OFFSET);
+        this.parts[s.kind].addTriangles(tri.positions, tri.indices, tri.normal);
+        added++;
+        continue;
+      }
       if (s.kind === 'other' && tri.normal[1] < -0.9) continue; // 下向きの面＝底
       const isRoof = s.kind === 'roof' || (s.kind === 'other' && tri.normal[1] > 0.3);
       (isRoof ? this.parts.roof : this.parts.wall).addTriangles(tri.positions, tri.indices, tri.normal);
@@ -156,8 +205,8 @@ export class SceneBuilder {
 
     // 付属物（ベランダ・ひさし・屋上の設備など）。本体と同じ高さだけずらす
     let installationFaces = 0;
-    if (useLod2 && this.opt.installations) {
-      for (const p of b.installations) {
+    if ((useLod2 || useLod3) && this.opt.installations) {
+      for (const p of useLod3 ? b.installations3 : b.installations) {
         const ext = this.toLocal(p.exterior);
         const holes = p.interiors.map((r) => this.toLocal(r));
         for (let i = 1; i < ext.length; i += 3) ext[i]! -= minY;
@@ -170,6 +219,7 @@ export class SceneBuilder {
       if (installationFaces > 0) this.buildingsWithInstallations++;
     }
 
+    if (useLod3) this.lod3Buildings++;
     if (b.attrs.city) this.cities.add(b.attrs.city);
     this.buildings.push({
       id: b.id,
@@ -183,7 +233,7 @@ export class SceneBuilder {
       city: b.attrs.city,
       x: Math.round(cx * 10) / 10,
       z: Math.round(cz * 10) / 10,
-      lodUsed: useLod2 ? 2 : 1,
+      lodUsed: useLod3 ? 3 : useLod2 ? 2 : 1,
       installationFaces,
     });
     return true;
