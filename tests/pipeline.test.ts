@@ -100,6 +100,36 @@ describe('GLB を作る流れ（テスト用の小さなデータ）', () => {
     expect(a.stats.triangles).toBeLessThan(b.stats.triangles);
   });
 
+  it('窓の模様：壁に模様の位置と画像が入り、Validator のエラー0件・three.js で読める', async () => {
+    const plain = await generateFromPlan(plan({ lod: 2 }), openText);
+    const res = await generateFromPlan(plan({ lod: 2, windows: true }), openText);
+    const report = await checkGlb(res.glb);
+    expect(report.validatorMessages.filter((m) => m.startsWith('エラー'))).toEqual([]);
+    expect(report.validatorErrors).toBe(0);
+    expect(report.loadedByThree).toBe(true);
+    expect(report.usesExtensions).toEqual([]);
+    // 形は同じで、増えるのは模様の画像1枚（約50KB）と壁の頂点ごとの模様の位置（8バイト）だけ
+    expect(res.stats.triangles).toBe(plain.stats.triangles);
+    const wallVertices = plain.stats.vertices; // 壁の頂点数はこれ以下
+    expect(res.glb.byteLength - plain.glb.byteLength).toBeLessThan(100_000 + wallVertices * 8);
+    expect(res.fileName).toContain('lod2_win');
+    expect(res.credit).toContain('実際の窓の位置ではない');
+    const json = new TextDecoder().decode(res.glb.slice(20, 20 + new DataView(res.glb.buffer).getUint32(12, true)));
+    const gltf = JSON.parse(json);
+    expect(gltf.images).toHaveLength(1);
+    expect(gltf.images[0].mimeType).toBe('image/png');
+    expect(gltf.images[0].uri).toBeUndefined(); // 外部ファイルの参照なし
+  });
+
+  it('付属物の指定は屋根の形あり（LOD2）のときだけ効く', async () => {
+    const a = await generateFromPlan(plan({ lod: 1, installations: true, includeRoads: false }), openText);
+    expect(a.fileName).toContain('lod1');
+    expect(a.stats.buildingsWithInstallations).toBe(0);
+    const b = await generateFromPlan(plan({ lod: 2, installations: true, includeRoads: false }), openText);
+    expect(b.fileName).toContain('lod2plus');
+    expect(b.credit).toContain('付属物');
+  });
+
   it('範囲の外の建物は入れない', async () => {
     // 東京駅から約1km東
     await expect(

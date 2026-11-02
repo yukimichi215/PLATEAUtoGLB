@@ -1,6 +1,12 @@
 // 三角形の集まりを、PlotBlock で読める GLB（画像も含めて1ファイル・圧縮なし）にする。
-import { Document, WebIO } from '@gltf-transform/core';
+import { Document, WebIO, type Texture } from '@gltf-transform/core';
+
+// glTF の画像の貼り方の番号（WebGL の定数）
+const GL_REPEAT = 10497;
+const GL_LINEAR = 9729;
+const GL_LINEAR_MIPMAP_LINEAR = 9987;
 import type { MeshPart, PartName } from './scene.js';
+import { windowTexturePng } from './windows.js';
 
 export interface GlbInput {
   parts: Record<PartName, MeshPart>;
@@ -16,13 +22,14 @@ export interface GlbInput {
 const MATERIALS: Record<PartName, { name: string; color: [number, number, number] }> = {
   wall: { name: '建物の壁', color: [0.86, 0.85, 0.82] },
   roof: { name: '建物の屋根', color: [0.62, 0.6, 0.57] },
+  detail: { name: '建物の付属物', color: [0.74, 0.73, 0.7] },
   road: { name: '道路', color: [0.36, 0.37, 0.39] },
   ground: { name: '地面', color: [0.55, 0.58, 0.5] },
 };
 
 /** 部品の名前（GLB の中のノード名・メッシュ名） */
 const GROUPS: { name: string; parts: PartName[] }[] = [
-  { name: 'Buildings', parts: ['wall', 'roof'] },
+  { name: 'Buildings', parts: ['wall', 'roof', 'detail'] },
   { name: 'Roads', parts: ['road'] },
   { name: 'Ground', parts: ['ground'] },
 ];
@@ -40,6 +47,9 @@ export async function buildGlb(input: GlbInput): Promise<Uint8Array> {
   const scene = doc.createScene(input.name);
   const root = doc.createNode(input.name).setExtras(input.extras);
   scene.addChild(root);
+  let texture: Texture | null = null;
+  const windowTexture = (): Texture =>
+    (texture ??= doc.createTexture('窓の模様').setImage(windowTexturePng()).setMimeType('image/png'));
 
   for (const group of GROUPS) {
     const mesh = doc.createMesh(group.name);
@@ -54,6 +64,19 @@ export async function buildGlb(input: GlbInput): Promise<Uint8Array> {
         .setRoughnessFactor(0.9)
         // 元データの面の向きがそろっていないことがあるので、裏からも見えるようにする
         .setDoubleSided(true);
+      if (part.uvs) {
+        // 模様（窓）を使う部品：画像の色をそのまま出し、繰り返して貼る
+        material
+          .setName(`${m.name}（窓の模様）`)
+          .setBaseColorFactor([1, 1, 1, 1])
+          .setBaseColorTexture(windowTexture());
+        material
+          .getBaseColorTextureInfo()!
+          .setWrapS(GL_REPEAT)
+          .setWrapT(GL_REPEAT)
+          .setMagFilter(GL_LINEAR)
+          .setMinFilter(GL_LINEAR_MIPMAP_LINEAR);
+      }
       const positions = doc
         .createAccessor()
         .setType('VEC3')
@@ -67,8 +90,14 @@ export async function buildGlb(input: GlbInput): Promise<Uint8Array> {
       const indexArray =
         part.vertexCount <= 65535 ? new Uint16Array(part.indices) : new Uint32Array(part.indices);
       const indices = doc.createAccessor().setType('SCALAR').setArray(indexArray).setBuffer(buffer);
-      const prim = doc
-        .createPrimitive()
+      const prim = doc.createPrimitive();
+      if (part.uvs) {
+        prim.setAttribute(
+          'TEXCOORD_0',
+          doc.createAccessor().setType('VEC2').setArray(new Float32Array(part.uvs)).setBuffer(buffer),
+        );
+      }
+      prim
         .setAttribute('POSITION', positions)
         .setAttribute('NORMAL', normals)
         .setIndices(indices)

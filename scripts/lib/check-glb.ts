@@ -47,6 +47,10 @@ export async function checkGlb(bytes: Uint8Array): Promise<GlbReport> {
   };
 
   try {
+    // Node.js には画像を開く仕組みがないので、three.js は模様の画像だけ読まずに進む（警告が出る）。
+    // 画像そのものの正しさは glTF Validator が確かめ、見た目は画面のプレビューで確かめる。
+    // three.js が画像の読み込みで参照する self を用意する。
+    (globalThis as { self?: unknown }).self ??= globalThis;
     const loader = new GLTFLoader();
     const ab = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
     const gltf = await loader.parseAsync(ab, '');
