@@ -121,11 +121,12 @@ searchForm.addEventListener('submit', async (ev) => {
 });
 
 function currentRequest(): AreaRequest {
-  const lod = (document.querySelector<HTMLInputElement>('input[name="lod"]:checked')?.value === '2' ? 2 : 1) as 1 | 2;
+  const detail = document.querySelector<HTMLInputElement>('input[name="detail"]:checked')?.value ?? 'box';
   return {
     center: { lat: selected!.lat, lon: selected!.lon },
     size: Number(sizeEl.value),
-    lod,
+    lod: detail === 'box' ? 1 : 2,
+    installations: detail === 'roofPlus',
     includeRoads: roadsEl.checked,
     includeGround: groundEl.checked,
     placeName: selected!.title,
@@ -193,6 +194,14 @@ makeBtn.addEventListener('click', async () => {
     const s = res.stats;
     statsEl.replaceChildren();
     addStat('建物', `${s.buildings.toLocaleString()} 棟`);
+    if (plan.request.installations) {
+      addStat(
+        'ベランダなどのある建物',
+        s.buildingsWithInstallations > 0
+          ? `${s.buildingsWithInstallations.toLocaleString()} 棟`
+          : 'なし（この地域のデータには入っていません）',
+      );
+    }
     if (plan.request.includeRoads) addStat('道路', `${s.roads.toLocaleString()} 本`);
     addStat('三角形の数', s.triangles.toLocaleString());
     addStat('ファイルの大きさ', mb(s.glbBytes));

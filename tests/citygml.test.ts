@@ -24,6 +24,29 @@ describe('CityGML の読み取り', () => {
     expect(ext.slice(-3)).not.toEqual(ext.slice(0, 3));
   });
 
+  it('付属物（ベランダなど）は本体と分けて読み、部屋の中は読まない', () => {
+    const ring = (h: number) =>
+      `<gml:Polygon><gml:exterior><gml:LinearRing><gml:posList>35.68 139.76 ${h} 35.6801 139.76 ${h} 35.6801 139.7601 ${h} 35.68 139.76 ${h}</gml:posList></gml:LinearRing></gml:exterior></gml:Polygon>`;
+    const xml = `<core:CityModel><core:cityObjectMember><bldg:Building gml:id="b1">
+<bldg:storeysAboveGround>3</bldg:storeysAboveGround>
+<bldg:boundedBy><bldg:RoofSurface><bldg:lod2MultiSurface><gml:MultiSurface><gml:surfaceMember>${ring(10)}</gml:surfaceMember></gml:MultiSurface></bldg:lod2MultiSurface></bldg:RoofSurface></bldg:boundedBy>
+<bldg:outerBuildingInstallation><bldg:BuildingInstallation gml:id="i1"><bldg:class>9</bldg:class><bldg:lod2Geometry><gml:MultiSurface>
+<gml:surfaceMember>${ring(5)}</gml:surfaceMember><gml:surfaceMember>${ring(6)}</gml:surfaceMember>
+</gml:MultiSurface></bldg:lod2Geometry></bldg:BuildingInstallation></bldg:outerBuildingInstallation>
+<bldg:interiorRoom><bldg:Room><bldg:lod4MultiSurface><gml:MultiSurface><gml:surfaceMember>${ring(1)}</gml:surfaceMember></gml:MultiSurface></bldg:lod4MultiSurface></bldg:Room></bldg:interiorRoom>
+</bldg:Building></core:cityObjectMember></core:CityModel>`;
+    const got: Building[] = [];
+    const reader = new CityGmlReader({ onBuilding: (b) => got.push(b) });
+    reader.feed(xml);
+    reader.close();
+    expect(got).toHaveLength(1);
+    expect(got[0]!.lod2).toHaveLength(1);
+    expect(got[0]!.lod2[0]!.kind).toBe('roof');
+    expect(got[0]!.installations).toHaveLength(2);
+    expect(got[0]!.attrs.class).toBeUndefined(); // 付属物の属性は建物の属性にしない
+    expect(got[0]!.attrs.storeysAboveGround).toBe(3);
+  });
+
   it('道路を読む', async () => {
     const roads: Road[] = [];
     await readCityGml(fixture('tran_sample.gml'), { onRoad: (r) => roads.push(r) });

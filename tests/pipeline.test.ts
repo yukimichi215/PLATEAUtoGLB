@@ -100,6 +100,15 @@ describe('GLB を作る流れ（テスト用の小さなデータ）', () => {
     expect(a.stats.triangles).toBeLessThan(b.stats.triangles);
   });
 
+  it('付属物の指定は屋根の形あり（LOD2）のときだけ効く', async () => {
+    const a = await generateFromPlan(plan({ lod: 1, installations: true, includeRoads: false }), openText);
+    expect(a.fileName).toContain('lod1');
+    expect(a.stats.buildingsWithInstallations).toBe(0);
+    const b = await generateFromPlan(plan({ lod: 2, installations: true, includeRoads: false }), openText);
+    expect(b.fileName).toContain('lod2plus');
+    expect(b.credit).toContain('付属物');
+  });
+
   it('範囲の外の建物は入れない', async () => {
     // 東京駅から約1km東
     await expect(

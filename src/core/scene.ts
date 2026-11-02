@@ -3,14 +3,13 @@ import type { Building, Polygon, Road, SurfaceKind } from './citygml.js';
 import { LocalProjector } from './geo.js';
 import { clipRingToSquare, triangulatePolygon } from './geometry.js';
 
-export type PartName = 'wall' | 'roof' | 'road' | 'ground';
+export type PartName = 'wall' | 'roof' | 'detail' | 'road' | 'ground';
 
 /** 1種類の材質で描く三角形の集まり。法線は面ごと（角ばったローポリの見た目） */
 export class MeshPart {
   positions: number[] = [];
   normals: number[] = [];
   indices: number[] = [];
-
   get vertexCount(): number {
     return this.positions.length / 3;
   }
@@ -35,6 +34,8 @@ export interface SceneOptions {
   half: number;
   /** 1 = 箱型（軽い）、2 = 屋根の形あり */
   lod: 1 | 2;
+  /** ベランダなどの付属物を入れる（LOD2 のときだけ） */
+  installations?: boolean;
 }
 
 export interface BuildingInfo {
@@ -52,18 +53,15 @@ export interface BuildingInfo {
   x: number;
   z: number;
   lodUsed: 1 | 2;
+  /** 入れた付属物の面の数 */
+  installationFaces: number;
 }
 
 /** 道路を地面よりわずかに上に置く高さ（m）。地面とちらつかないため */
 export const ROAD_HEIGHT = 0.15;
 
 export class SceneBuilder {
-  readonly parts: Record<PartName, MeshPart> = {
-    wall: new MeshPart(),
-    roof: new MeshPart(),
-    road: new MeshPart(),
-    ground: new MeshPart(),
-  };
+  readonly parts: Record<PartName, MeshPart>;
   readonly buildings: BuildingInfo[] = [];
   readonly cities = new Set<string>();
   private readonly seen = new Set<string>();
@@ -71,7 +69,18 @@ export class SceneBuilder {
   /** 範囲内の建物のうち、形が読めずに省いた数 */
   skippedBuildings = 0;
 
-  constructor(private readonly opt: SceneOptions) {}
+  /** 付属物を入れた建物の数 */
+  buildingsWithInstallations = 0;
+
+  constructor(private readonly opt: SceneOptions) {
+    this.parts = {
+      wall: new MeshPart(),
+      roof: new MeshPart(),
+      detail: new MeshPart(),
+      road: new MeshPart(),
+      ground: new MeshPart(),
+    };
+  }
 
   /** 緯度経度の多角形をローカル座標（x, 標高, z）にする */
   private toLocal(coords: number[]): number[] {
@@ -136,16 +145,29 @@ export class SceneBuilder {
       const tri = triangulatePolygon(s.exterior, s.interiors);
       if (!tri) continue;
       if (s.kind === 'other' && tri.normal[1] < -0.9) continue; // 下向きの面＝底
-      const part =
-        s.kind === 'roof' || (s.kind === 'other' && tri.normal[1] > 0.3)
-          ? this.parts.roof
-          : this.parts.wall;
-      part.addTriangles(tri.positions, tri.indices, tri.normal);
+      const isRoof = s.kind === 'roof' || (s.kind === 'other' && tri.normal[1] > 0.3);
+      (isRoof ? this.parts.roof : this.parts.wall).addTriangles(tri.positions, tri.indices, tri.normal);
       added++;
     }
     if (added === 0) {
       this.skippedBuildings++;
       return false;
+    }
+
+    // 付属物（ベランダ・ひさし・屋上の設備など）。本体と同じ高さだけずらす
+    let installationFaces = 0;
+    if (useLod2 && this.opt.installations) {
+      for (const p of b.installations) {
+        const ext = this.toLocal(p.exterior);
+        const holes = p.interiors.map((r) => this.toLocal(r));
+        for (let i = 1; i < ext.length; i += 3) ext[i]! -= minY;
+        for (const r of holes) for (let i = 1; i < r.length; i += 3) r[i]! -= minY;
+        const tri = triangulatePolygon(ext, holes);
+        if (!tri) continue;
+        this.parts.detail.addTriangles(tri.positions, tri.indices, tri.normal);
+        installationFaces++;
+      }
+      if (installationFaces > 0) this.buildingsWithInstallations++;
     }
 
     if (b.attrs.city) this.cities.add(b.attrs.city);
@@ -162,6 +184,7 @@ export class SceneBuilder {
       x: Math.round(cx * 10) / 10,
       z: Math.round(cz * 10) / 10,
       lodUsed: useLod2 ? 2 : 1,
+      installationFaces,
     });
     return true;
   }

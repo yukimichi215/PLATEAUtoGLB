@@ -71,9 +71,9 @@ export function buildCredit(used: UsedFile[], area: { description: string; creat
   lines.push('');
   lines.push('【加工の内容】');
   lines.push(`・${area.description}`);
-  lines.push('・形を軽くする（建物の底面を省く、面の細かな情報や模様は使わない）');
+  lines.push('・形を軽くする（建物の底面を省く、面の細かな情報や PLATEAU の写真の模様は使わない）');
   lines.push('・建物の地面の高さを 0 にそろえて並べ直す（地形は含まない）');
-  lines.push('・道路は範囲の形に切り取り、平らな板にする');
+  if (used.some((u) => u.file.type === 'tran')) lines.push('・道路は範囲の形に切り取り、平らな板にする');
   lines.push('');
   lines.push('このファイルは、上記のデータをもとに PLATEAUtoGLB で加工して作成したものです。');
   lines.push('国土交通省・各自治体が作成したものではありません。');

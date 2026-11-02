@@ -31,6 +31,8 @@ export interface Building {
   lod1: Polygon[];
   /** LOD2：屋根の形あり。面の種類つき */
   lod2: { kind: SurfaceKind; polygon: Polygon }[];
+  /** ベランダ・ひさし・屋上の設備などの付属物（LOD2 の形。地域によってはない） */
+  installations: Polygon[];
 }
 
 export interface Road {
@@ -116,6 +118,10 @@ export class CityGmlReader {
   private lod1Depth = -1;
   private lod2Depth = -1;
   private installationDepth = -1;
+  /** 付属物の中の形（bldg:lod2Geometry） */
+  private installationGeomDepth = -1;
+  /** 部屋の中（使わないので読み飛ばす） */
+  private roomDepth = -1;
   private surfaceKind: SurfaceKind | null = null;
   private surfaceDepth = -1;
   private roadLod1Depth = -1;
@@ -151,7 +157,7 @@ export class CityGmlReader {
 
     if (name === 'bldg:Building' && !this.building) {
       const id = String(node.attributes['gml:id'] ?? '');
-      this.building = { id, attrs: {}, lod1: [], lod2: [] };
+      this.building = { id, attrs: {}, lod1: [], lod2: [], installations: [] };
       this.buildingDepth = depth;
       return;
     }
@@ -165,8 +171,16 @@ export class CityGmlReader {
 
     if (this.building) {
       if (name === 'bldg:lod1Solid') this.lod1Depth = depth;
-      else if (name === 'bldg:outerBuildingInstallation' || name === 'bldg:interiorRoom') {
+      else if (name === 'bldg:interiorRoom') {
+        if (this.roomDepth < 0) this.roomDepth = depth;
+      } else if (name === 'bldg:outerBuildingInstallation') {
         if (this.installationDepth < 0) this.installationDepth = depth;
+      } else if (
+        this.installationDepth >= 0 &&
+        (name === 'bldg:lod2Geometry' || name === 'bldg:lod2MultiSurface') &&
+        this.installationGeomDepth < 0
+      ) {
+        this.installationGeomDepth = depth;
       } else if (name in SURFACE_KIND && this.surfaceDepth < 0) {
         this.surfaceKind = SURFACE_KIND[name] ?? 'other';
         this.surfaceDepth = depth;
@@ -175,7 +189,7 @@ export class CityGmlReader {
         this.lod2Depth < 0
       ) {
         this.lod2Depth = depth;
-      } else if (name in ATTR_TAGS && this.installationDepth < 0) {
+      } else if (name in ATTR_TAGS && this.installationDepth < 0 && this.roomDepth < 0) {
         this.startText();
       }
     } else if (this.road) {
@@ -197,7 +211,8 @@ export class CityGmlReader {
   /** 今の位置の多角形を集めるべきか */
   private wantsGeometry(): boolean {
     if (this.building) {
-      if (this.installationDepth >= 0) return false;
+      if (this.roomDepth >= 0) return false;
+      if (this.installationDepth >= 0) return this.installationGeomDepth >= 0;
       return this.lod1Depth >= 0 || this.lod2Depth >= 0;
     }
     if (this.road) return this.roadLod1Depth >= 0;
@@ -261,6 +276,8 @@ export class CityGmlReader {
     if (depth === this.lod1Depth) this.lod1Depth = -1;
     if (depth === this.lod2Depth) this.lod2Depth = -1;
     if (depth === this.installationDepth) this.installationDepth = -1;
+    if (depth === this.installationGeomDepth) this.installationGeomDepth = -1;
+    if (depth === this.roomDepth) this.roomDepth = -1;
     if (depth === this.surfaceDepth) {
       this.surfaceDepth = -1;
       this.surfaceKind = null;
@@ -282,7 +299,9 @@ export class CityGmlReader {
 
   private addPolygon(poly: Polygon): void {
     if (this.building) {
-      if (this.lod1Depth >= 0) {
+      if (this.installationDepth >= 0) {
+        if (this.installationGeomDepth >= 0) this.building.installations.push(poly);
+      } else if (this.lod1Depth >= 0) {
         this.building.lod1.push(poly);
       } else if (this.lod2Depth >= 0) {
         this.building.lod2.push({ kind: this.surfaceKind ?? 'other', polygon: poly });

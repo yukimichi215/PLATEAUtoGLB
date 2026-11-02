@@ -16,6 +16,8 @@ export interface AreaRequest {
   /** 切り出す正方形の一辺（m） */
   size: number;
   lod: 1 | 2;
+  /** ベランダ・ひさし・屋上の設備などの付属物を入れる（屋根の形あり〔LOD2〕のときだけ） */
+  installations?: boolean;
   includeRoads: boolean;
   includeGround: boolean;
   /** 場所の名前（表示・記録用） */
@@ -73,6 +75,8 @@ export interface GenerateStats {
   depth: number;
   height: number;
   skippedBuildings: number;
+  /** 付属物（ベランダなど）を入れた建物の数 */
+  buildingsWithInstallations: number;
 }
 
 export interface GenerateResult {
@@ -82,6 +86,17 @@ export interface GenerateResult {
   stats: GenerateStats;
   buildings: BuildingInfo[];
   fileName: string;
+}
+
+/** 建物の細かさの名前（記録・出典の説明用） */
+export function detailLabel(req: AreaRequest): string {
+  if (req.lod === 1) return '箱型（LOD1）';
+  return req.installations ? '屋根の形とベランダなどの付属物あり（LOD2）' : '屋根の形あり（LOD2）';
+}
+
+/** ファイル名に付ける細かさの印 */
+function detailCode(req: AreaRequest): string {
+  return req.lod === 1 ? 'lod1' : req.installations ? 'lod2plus' : 'lod2';
 }
 
 function today(): string {
@@ -104,7 +119,12 @@ export async function generateFromPlan(
     throw new Error('この場所には PLATEAU の建物データがありません（まだ整備されていない地域の可能性があります）。');
   }
   const projector = new LocalProjector(req.center);
-  const scene = new SceneBuilder({ projector, half: req.size / 2, lod: req.lod });
+  const scene = new SceneBuilder({
+    projector,
+    half: req.size / 2,
+    lod: req.lod,
+    installations: req.lod === 2 && req.installations === true,
+  });
   const used: UsedFile[] = [];
 
   // 進み具合の重み。大きさが分からないファイルは仮に 20MB とみなす
@@ -147,7 +167,8 @@ export async function generateFromPlan(
   onProgress({ ratio: 1, message: 'GLB を作成中…' });
   const createdAt = today();
   const place = req.placeName?.trim() || `${req.center.lat.toFixed(5)},${req.center.lon.toFixed(5)}`;
-  const description = `「${place}」を中心に一辺 ${req.size} m の範囲を切り出し（中心 緯度 ${req.center.lat.toFixed(6)}・経度 ${req.center.lon.toFixed(6)}）、${req.lod === 1 ? '箱型（LOD1）' : '屋根の形あり（LOD2）'}の建物にする`;
+  const detail = detailLabel(req);
+  const description = `「${place}」を中心に一辺 ${req.size} m の範囲を切り出し（中心 緯度 ${req.center.lat.toFixed(6)}・経度 ${req.center.lon.toFixed(6)}）、${detail}の建物にする`;
   const credit = buildCredit(used, { description, createdAt });
 
   const extras = {
@@ -169,6 +190,7 @@ export async function generateFromPlan(
         centerLon: req.center.lon,
         sizeMeters: req.size,
         lod: req.lod,
+        installations: req.lod === 2 && req.installations === true,
         origin: '範囲の中心・地面の高さ0。単位はメートル、+Y が上、-Z が北',
       },
       createdAt,
@@ -197,7 +219,7 @@ export async function generateFromPlan(
     credit: credit.text,
     copyright: credit.short,
     buildings: scene.buildings,
-    fileName: `plateau_${safeFileName(place)}_${req.size}m_lod${req.lod}`,
+    fileName: `plateau_${safeFileName(place)}_${req.size}m_${detailCode(req)}`,
     stats: {
       buildings: scene.buildings.length,
       roads: scene.roadCount,
@@ -208,6 +230,7 @@ export async function generateFromPlan(
       depth: r1(maxZ - minZ),
       height: r1(maxY - minY),
       skippedBuildings: scene.skippedBuildings,
+      buildingsWithInstallations: scene.buildingsWithInstallations,
     },
   };
 }

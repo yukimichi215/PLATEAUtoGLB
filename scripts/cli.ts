@@ -17,6 +17,7 @@ const { values } = parseArgs({
     name: { type: 'string' },
     out: { type: 'string', default: 'out' },
     'no-roads': { type: 'boolean', default: false },
+    installations: { type: 'boolean', default: false },
     'no-ground': { type: 'boolean', default: false },
     'max-mb': { type: 'string', default: '1000' },
     'max-file-mb': { type: 'string', default: '200' },
@@ -24,7 +25,7 @@ const { values } = parseArgs({
 });
 
 if (!values.lat || !values.lon) {
-  console.error('使い方: npm run cli -- --lat <緯度> --lon <経度> [--size 300] [--lod 1|2] [--name 名前]');
+  console.error('使い方: npm run cli -- --lat <緯度> --lon <経度> [--size 300] [--lod 1|2] [--installations] [--name 名前]');
   process.exit(1);
 }
 
@@ -83,6 +84,7 @@ const req = {
   center: { lat: Number(values.lat), lon: Number(values.lon) },
   size: Number(values.size),
   lod: (values.lod === '2' ? 2 : 1) as 1 | 2,
+  installations: values.installations,
   includeRoads: !values['no-roads'],
   includeGround: !values['no-ground'],
   placeName: values.name,

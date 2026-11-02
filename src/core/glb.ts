@@ -16,13 +16,14 @@ export interface GlbInput {
 const MATERIALS: Record<PartName, { name: string; color: [number, number, number] }> = {
   wall: { name: '建物の壁', color: [0.86, 0.85, 0.82] },
   roof: { name: '建物の屋根', color: [0.62, 0.6, 0.57] },
+  detail: { name: '建物の付属物', color: [0.74, 0.73, 0.7] },
   road: { name: '道路', color: [0.36, 0.37, 0.39] },
   ground: { name: '地面', color: [0.55, 0.58, 0.5] },
 };
 
 /** 部品の名前（GLB の中のノード名・メッシュ名） */
 const GROUPS: { name: string; parts: PartName[] }[] = [
-  { name: 'Buildings', parts: ['wall', 'roof'] },
+  { name: 'Buildings', parts: ['wall', 'roof', 'detail'] },
   { name: 'Roads', parts: ['road'] },
   { name: 'Ground', parts: ['ground'] },
 ];
