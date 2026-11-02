@@ -15,7 +15,6 @@ const placeEl = $<HTMLParagraphElement>('place');
 const sizeEl = $<HTMLSelectElement>('size');
 const roadsEl = $<HTMLInputElement>('roads');
 const groundEl = $<HTMLInputElement>('ground');
-const windowsEl = $<HTMLInputElement>('windows');
 const makeBtn = $<HTMLButtonElement>('make-btn');
 const progressEl = $<HTMLDivElement>('progress');
 const progressFill = $<HTMLDivElement>('progress-fill');
@@ -128,7 +127,6 @@ function currentRequest(): AreaRequest {
     size: Number(sizeEl.value),
     lod: detail === 'box' ? 1 : 2,
     installations: detail === 'roofPlus',
-    windows: windowsEl.checked,
     includeRoads: roadsEl.checked,
     includeGround: groundEl.checked,
     placeName: selected!.title,

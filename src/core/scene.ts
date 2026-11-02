@@ -2,7 +2,6 @@
 import type { Building, Polygon, Road, SurfaceKind } from './citygml.js';
 import { LocalProjector } from './geo.js';
 import { clipRingToSquare, triangulatePolygon } from './geometry.js';
-import { storeyHeight, wallUvs } from './windows.js';
 
 export type PartName = 'wall' | 'roof' | 'detail' | 'road' | 'ground';
 
@@ -11,13 +10,6 @@ export class MeshPart {
   positions: number[] = [];
   normals: number[] = [];
   indices: number[] = [];
-  /** 模様の位置（u, v の並び）。模様を使う部品だけ */
-  uvs: number[] | null;
-
-  constructor(withUvs = false) {
-    this.uvs = withUvs ? [] : null;
-  }
-
   get vertexCount(): number {
     return this.positions.length / 3;
   }
@@ -25,17 +17,8 @@ export class MeshPart {
     return this.indices.length / 3;
   }
 
-  addTriangles(
-    positions: number[],
-    indices: number[],
-    normal: [number, number, number],
-    uvs?: number[],
-  ): void {
+  addTriangles(positions: number[], indices: number[], normal: [number, number, number]): void {
     const base = this.vertexCount;
-    if (this.uvs) {
-      if (!uvs || uvs.length !== (positions.length / 3) * 2) throw new Error('模様の位置の数が頂点と合いません');
-      for (const u of uvs) this.uvs.push(u);
-    }
     for (let i = 0; i < positions.length; i += 3) {
       this.positions.push(positions[i]!, positions[i + 1]!, positions[i + 2]!);
       this.normals.push(normal[0], normal[1], normal[2]);
@@ -53,8 +36,6 @@ export interface SceneOptions {
   lod: 1 | 2;
   /** ベランダなどの付属物を入れる（LOD2 のときだけ） */
   installations?: boolean;
-  /** 壁に窓の模様を付ける */
-  windows?: boolean;
 }
 
 export interface BuildingInfo {
@@ -93,7 +74,7 @@ export class SceneBuilder {
 
   constructor(private readonly opt: SceneOptions) {
     this.parts = {
-      wall: new MeshPart(opt.windows === true),
+      wall: new MeshPart(),
       roof: new MeshPart(),
       detail: new MeshPart(),
       road: new MeshPart(),
@@ -155,7 +136,6 @@ export class SceneBuilder {
     }
     if (!Number.isFinite(minY)) return false;
 
-    const floorHeight = storeyHeight(maxY - minY, b.attrs.storeysAboveGround);
     let added = 0;
     for (const s of local) {
       // 底の面は見えないので入れない（三角形を減らす）
@@ -166,12 +146,7 @@ export class SceneBuilder {
       if (!tri) continue;
       if (s.kind === 'other' && tri.normal[1] < -0.9) continue; // 下向きの面＝底
       const isRoof = s.kind === 'roof' || (s.kind === 'other' && tri.normal[1] > 0.3);
-      if (isRoof) {
-        this.parts.roof.addTriangles(tri.positions, tri.indices, tri.normal);
-      } else {
-        const uvs = this.opt.windows ? wallUvs(tri.positions, tri.normal, floorHeight) : undefined;
-        this.parts.wall.addTriangles(tri.positions, tri.indices, tri.normal, uvs);
-      }
+      (isRoof ? this.parts.roof : this.parts.wall).addTriangles(tri.positions, tri.indices, tri.normal);
       added++;
     }
     if (added === 0) {

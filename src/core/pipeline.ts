@@ -18,8 +18,6 @@ export interface AreaRequest {
   lod: 1 | 2;
   /** ベランダ・ひさし・屋上の設備などの付属物を入れる（屋根の形あり〔LOD2〕のときだけ） */
   installations?: boolean;
-  /** 壁に窓の模様を付ける（見た目用。本物の窓の位置ではない） */
-  windows?: boolean;
   includeRoads: boolean;
   includeGround: boolean;
   /** 場所の名前（表示・記録用） */
@@ -98,8 +96,7 @@ export function detailLabel(req: AreaRequest): string {
 
 /** ファイル名に付ける細かさの印 */
 function detailCode(req: AreaRequest): string {
-  const base = req.lod === 1 ? 'lod1' : req.installations ? 'lod2plus' : 'lod2';
-  return req.windows ? `${base}_win` : base;
+  return req.lod === 1 ? 'lod1' : req.installations ? 'lod2plus' : 'lod2';
 }
 
 function today(): string {
@@ -127,7 +124,6 @@ export async function generateFromPlan(
     half: req.size / 2,
     lod: req.lod,
     installations: req.lod === 2 && req.installations === true,
-    windows: req.windows === true,
   });
   const used: UsedFile[] = [];
 
@@ -172,7 +168,7 @@ export async function generateFromPlan(
   const createdAt = today();
   const place = req.placeName?.trim() || `${req.center.lat.toFixed(5)},${req.center.lon.toFixed(5)}`;
   const detail = detailLabel(req);
-  const description = `「${place}」を中心に一辺 ${req.size} m の範囲を切り出し（中心 緯度 ${req.center.lat.toFixed(6)}・経度 ${req.center.lon.toFixed(6)}）、${detail}の建物にする${req.windows ? '。壁の窓の模様は見た目のために自動で描いたもので、実際の窓の位置ではない' : ''}`;
+  const description = `「${place}」を中心に一辺 ${req.size} m の範囲を切り出し（中心 緯度 ${req.center.lat.toFixed(6)}・経度 ${req.center.lon.toFixed(6)}）、${detail}の建物にする`;
   const credit = buildCredit(used, { description, createdAt });
 
   const extras = {
@@ -195,7 +191,6 @@ export async function generateFromPlan(
         sizeMeters: req.size,
         lod: req.lod,
         installations: req.lod === 2 && req.installations === true,
-        windowPattern: req.windows === true,
         origin: '範囲の中心・地面の高さ0。単位はメートル、+Y が上、-Z が北',
       },
       createdAt,
