@@ -30,11 +30,21 @@ export type UnionResult<K extends string> = { positions: Float32Array; indices: 
 /**
  * 立体をすべて1つにまとめる。どの三角形がどの key（建物・道路・台座）から来たかは残す（色分けのため）。
  * 重なった部分は内側になって消え、接している面は1つにつながる。
+ * clipHalf を指定すると範囲の外を切り落とす（切り口も閉じた面になる）。
  * 体積が minVolume より小さいかけら（計算の誤差でできる薄い殻）は除き、tolerance 以内の細かな凹凸はならす。
  */
 export async function unionSolids<K extends string>(
   groups: UnionGroup<K>[],
-  { minVolume = 0, tolerance = 0 }: { minVolume?: number; tolerance?: number } = {},
+  {
+    minVolume = 0,
+    tolerance = 0,
+    clipHalf,
+  }: {
+    minVolume?: number;
+    tolerance?: number;
+    /** 指定すると、上から見て [-clipHalf, clipHalf] の正方形の外を切り落とす */
+    clipHalf?: number;
+  } = {},
 ): Promise<UnionResult<K>> {
   const m = await manifold();
   const toDelete: { delete(): void }[] = [];
@@ -54,7 +64,17 @@ export async function unionSolids<K extends string>(
         toDelete.push(man);
         return man;
       });
-      const joined = m.Manifold.union(pieces).asOriginal();
+      let joined = m.Manifold.union(pieces);
+      toDelete.push(joined);
+      if (clipHalf !== undefined) {
+        // 範囲の正方形の柱（高さは十分に大きく）と重なる部分だけ残す。切り口の面もこの key の色にする
+        const h = clipHalf;
+        const clipBox = m.Manifold.cube([2 * h, 2e5, 2 * h], true);
+        toDelete.push(clipBox);
+        joined = joined.intersect(clipBox);
+        toDelete.push(joined);
+      }
+      joined = joined.asOriginal();
       toDelete.push(joined);
       idToKey.set(joined.originalID(), g.key);
       parts.push(joined);

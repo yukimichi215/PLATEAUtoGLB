@@ -104,14 +104,6 @@ export function clipRingToSquare(ring: number[], half: number): number[] {
   return clipRing(ring, half, 2, 0, 1);
 }
 
-/**
- * 立体の多角形（[x, 高さ, z, ...]）を、上から見て四角い範囲 [-half, half] で切り取る。
- * 切り口の点の高さは、辺の上で直線的に求める（傾いた屋根も形を保つ）。
- */
-export function clipRing3ToSquare(ring: number[], half: number): number[] {
-  return clipRing(ring, half, 3, 0, 2);
-}
-
 function clipRing(ring: number[], half: number, stride: number, ax: number, az: number): number[] {
   let pts = ring;
   const edges: [number, number, number][] = [

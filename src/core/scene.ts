@@ -1,8 +1,8 @@
 // 建物・道路を、切り出した範囲の中心を原点にした三角形の集まりにする。
 import type { Building, Lod3Kind, Polygon, Road } from './citygml.js';
 import { LocalProjector } from './geo.js';
-import { clipRing3ToSquare, clipRingToSquare, triangulatePolygon } from './geometry.js';
-import { extrudeDown, type Solid } from './solid.js';
+import { clipRingToSquare, triangulatePolygon } from './geometry.js';
+import { extrudeDown, footprintArea, MIN_FOOTPRINT_M2, type Solid } from './solid.js';
 
 export type PartName = 'wall' | 'roof' | 'detail' | 'window' | 'door' | 'road' | 'ground';
 
@@ -147,6 +147,8 @@ export class SceneBuilder {
 
   /** 付属物を入れた建物の数 */
   buildingsWithInstallations = 0;
+  /** 3Dプリンタ用：形がくずれていて閉じた形にできず、入れられなかった屋根の面・道路の数 */
+  droppedFaces = 0;
   /** 窓・扉まである形（LOD3）で入れた建物の数 */
   lod3Buildings = 0;
 
@@ -310,27 +312,29 @@ export class SceneBuilder {
     if (b.lod1.length > 0) candidates.push(b.lod1.map((p) => this.localSurface('other', p)));
     for (const surfaces of candidates) {
       const solids: Solid[] = [];
+      let failed = 0;
       for (const s of surfaces) {
         if (s.kind !== 'roof' && s.kind !== 'other') continue;
         // 上か下を向いた面だけ使う（壁は使わない）。元データの面の表裏はそろっていないことがあるので、向きの符号は見ない
         const tri = triangulatePolygon(s.exterior, s.interiors);
         if (!tri || Math.abs(tri.normal[1]) < (s.kind === 'roof' ? 0.05 : 0.3)) continue;
-        // 3Dプリンタ用は、範囲からはみ出した部分を切り落として、台座をちょうど切り出した正方形にする
-        const half = this.opt.half;
-        const ext = clipRing3ToSquare(s.exterior.map((v, i) => (i % 3 === 1 ? v - minY : v)), half);
-        if (ext.length === 0) continue;
-        const holes = s.interiors
-          .map((r) => clipRing3ToSquare(r.map((v, i) => (i % 3 === 1 ? v - minY : v)), half))
-          .filter((r) => r.length > 0);
+        // 範囲からはみ出した部分は、柱にしてから立体として切り落とす（print.ts）。
+        // 多角形のまま切ると、へこんだ形で幅 0 の橋ができて閉じた形にならないことがあるため
+        const ext = s.exterior.map((v, i) => (i % 3 === 1 ? v - minY : v));
+        const holes = s.interiors.map((r) => r.map((v, i) => (i % 3 === 1 ? v - minY : v)));
         // 地面の高さにある面（建物の底）は使わない
         let top = -Infinity;
         for (let i = 1; i < ext.length; i += 3) top = Math.max(top, ext[i]!);
         if (top < 0.05) continue;
+        // 上から見てごく小さな面（壁に近い面・小さな飾り）は、印刷では見えないので数えずに省く
+        if (footprintArea(ext) < MIN_FOOTPRINT_M2) continue;
         const solid = extrudeDown(ext, holes, SOLID_BOTTOM);
         if (solid) solids.push(solid);
+        else failed++;
       }
       if (solids.length > 0) {
         this.solids.buildings.push(...solids);
+        this.droppedFaces += failed;
         return true;
       }
     }
@@ -365,8 +369,15 @@ export class SceneBuilder {
         return out;
       };
       if (this.opt.solid) {
-        const solid = extrudeDown(to3(ext), holes.map(to3), SOLID_BOTTOM);
-        if (!solid) continue;
+        // 3Dプリンタ用は切らずに板を作り、範囲の外はあとで立体として切り落とす（print.ts）。
+        // 多角形のまま切ると、へこんだ形で幅 0 の橋ができて閉じた形にならないことがあるため
+        const ring = to3(toXZ(p.exterior));
+        if (footprintArea(ring) < MIN_FOOTPRINT_M2) continue;
+        const solid = extrudeDown(ring, p.interiors.map((h) => to3(toXZ(h))), SOLID_BOTTOM);
+        if (!solid) {
+          this.droppedFaces++;
+          continue;
+        }
         for (let i = 1; i < solid.positions.length; i += 3) {
           if (solid.positions[i] === ROAD_HEIGHT) solid.positions[i] = SOLID_ROAD_TOP;
         }

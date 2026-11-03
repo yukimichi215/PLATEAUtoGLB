@@ -253,6 +253,9 @@ makeBtn.addEventListener('click', async () => {
       addStat('縮尺', s.print.scaleLabel);
       addStat('印刷したときの大きさ（幅×奥行き×高さ）', `${s.print.widthMm} × ${s.print.depthMm} × ${s.print.heightMm} mm`);
       addStat('台座の厚さ', s.print.baseMm > 0 ? `${s.print.baseMm} mm` : 'なし');
+      if (s.print.droppedFaces > 0) {
+        addStat('形がくずれていて入れられなかった面', `${s.print.droppedFaces} 枚（屋根の一部・道路）`);
+      }
     } else {
       addStat('外形（幅×奥行き×高さ）', `${s.width} × ${s.depth} × ${s.height} m`);
     }

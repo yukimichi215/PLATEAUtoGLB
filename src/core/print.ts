@@ -41,6 +41,8 @@ export interface PrintInfo {
   /** 「1/1000」のような縮尺の表し方（長さに合わせたときは近い値） */
   scaleLabel: string;
   baseMm: number;
+  /** 形がくずれていて閉じた形にできず、入れられなかった屋根の面・道路の数 */
+  droppedFaces: number;
   /** 印刷したときの大きさ（mm） */
   widthMm: number;
   depthMm: number;
@@ -56,7 +58,7 @@ function scaleLabelOf(mmPerMeter: number): string {
 
 /**
  * 閉じた形で作った場面（SceneBuilder の solid）を仕上げる。
- * 建物・道路は範囲の正方形で切り落としてあるので、台座はちょうど切り出した正方形にする。
+ * 建物・道路は範囲の正方形で切り落とし（立体として切るので切り口も閉じる）、台座はちょうど切り出した正方形にする。
  * 建物・道路の下端は台座の厚さの半分まで食い込ませ、台座とあわせて1つの立体にまとめる
  * （浮いた部品・重なった面・すき間をなくし、どの辺もちょうど2つの面が共有する形にする）。
  * 結果は scene.parts（roof＝建物、road＝道路、ground＝台座）に入れる。単位はまだメートル（実物の大きさ）のまま。
@@ -78,7 +80,11 @@ export async function finishForPrint(scene: SceneBuilder, half: number, opt: Pri
   ];
   if (baseM > 0) groups.push({ key: 'ground', solids: [box(-half, half, -baseM, 0, -half, half)] });
   // 印刷で 0.001 mm³ に満たないかけらは除き、0.01 mm より細かい凹凸はならす（実物の大きさに直して渡す）
-  const result = await unionSolids(groups, { minVolume: 1e-3 / mmPerMeter ** 3, tolerance: PRINT_TOLERANCE_MM / mmPerMeter });
+  const result = await unionSolids(groups, {
+    minVolume: 1e-3 / mmPerMeter ** 3,
+    tolerance: PRINT_TOLERANCE_MM / mmPerMeter,
+    clipHalf: half,
+  });
   let maxY = 0;
   for (const g of groups) {
     const idx = result.indices[g.key];
@@ -90,6 +96,7 @@ export async function finishForPrint(scene: SceneBuilder, half: number, opt: Pri
     mmPerMeter,
     scaleLabel: opt.fitSideMm !== undefined ? `約${scaleLabelOf(mmPerMeter)}` : `1/${opt.scaleDenominator}`,
     baseMm: opt.baseMm,
+    droppedFaces: scene.droppedFaces,
     widthMm: r1(2 * half * mmPerMeter),
     depthMm: r1(2 * half * mmPerMeter),
     heightMm: r1(maxY * mmPerMeter + opt.baseMm),

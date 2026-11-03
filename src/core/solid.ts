@@ -37,6 +37,15 @@ function ringNy(ring: number[]): number {
   return ny;
 }
 
+/** 上から見た面積（m²）。近すぎる点は除いて数える */
+export function footprintArea(ring: number[]): number {
+  const r = cleanRing(ring);
+  return r.length === 0 ? 0 : Math.abs(ringNy(r)) / 2;
+}
+
+/** これより上から見た面積が小さい面（10 cm 角ほど。壁のような面や、ごく小さな飾り）は柱にしない */
+export const MIN_FOOTPRINT_M2 = 0.01;
+
 function reverseRing(ring: number[]): number[] {
   const out: number[] = [];
   for (let i = ring.length - 3; i >= 0; i -= 3) out.push(ring[i]!, ring[i + 1]!, ring[i + 2]!);
@@ -52,12 +61,12 @@ export function extrudeDown(exterior: number[], interiors: number[][], bottomY: 
   let ext = cleanRing(exterior);
   if (ext.length === 0) return null;
   const nyExt = ringNy(ext);
-  if (Math.abs(nyExt) / 2 < 0.01) return null; // 上から見た面積が 0.01 m² 未満
+  if (Math.abs(nyExt) / 2 < MIN_FOOTPRINT_M2) return null;
   if (nyExt < 0) ext = reverseRing(ext);
   const rings: number[][] = [ext];
   for (const h of interiors) {
     let hole = cleanRing(h);
-    if (hole.length === 0 || Math.abs(ringNy(hole)) / 2 < 0.01) continue;
+    if (hole.length === 0 || Math.abs(ringNy(hole)) / 2 < MIN_FOOTPRINT_M2) continue;
     if (ringNy(hole) > 0) hole = reverseRing(hole); // 穴は外周と逆向き
     rings.push(hole);
   }

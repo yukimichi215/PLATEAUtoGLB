@@ -5,7 +5,10 @@ import { checkGlb } from '../scripts/lib/check-glb.js';
 import { checkMesh, piecesOf as pieces } from '../scripts/lib/check-mesh.js';
 import type { SourceFile } from '../src/core/catalog.js';
 import { generateFromPlan, planArea, type AreaPlan, type AreaRequest, type OpenText } from '../src/core/pipeline.js';
-import type { PrintOptions } from '../src/core/print.js';
+import type { Building } from '../src/core/citygml.js';
+import { LocalProjector, metersPerDegree } from '../src/core/geo.js';
+import { finishForPrint, type PrintOptions } from '../src/core/print.js';
+import { SceneBuilder } from '../src/core/scene.js';
 import { box, countOpenEdges, extrudeDown } from '../src/core/solid.js';
 
 const FIXTURE: Record<string, string> = { bldg: 'bldg_tokyo_station.gml', tran: 'tran_sample.gml' };
@@ -170,5 +173,78 @@ describe('3Dプリンタ用（縮尺・台座・閉じた形）', () => {
     await expect(planArea({ ...req, print: { scaleDenominator: 10, baseMm: 3 } }, noFetch)).rejects.toThrow('縮尺');
     await expect(planArea({ ...req, print: { fitSideMm: 5, baseMm: 3 } }, noFetch)).rejects.toThrow('長さ');
     await expect(planArea({ ...req, print: { scaleDenominator: 1000, baseMm: -1 } }, noFetch)).rejects.toThrow('台座');
+  });
+});
+
+describe('範囲の端で切り落とす（へこんだ形）', () => {
+  it('C 字形の建物を範囲の線で切っても捨てずに、切り口の閉じた形が2つ残る', async () => {
+    const center = { lat: 35.68, lon: 139.76 };
+    const m = metersPerDegree(center.lat);
+    // ローカル座標（x 東, z 南, 高さ）→ 緯度・経度・高さ
+    const ring = (pts: number[][], h: number) =>
+      pts.flatMap(([x, z]) => [center.lat - z! / m.lat, center.lon + x! / m.lon, h]);
+    // 左に開いた C 字形（x = 10 より右でつながっている）。範囲は一辺 20m（x = ±10 で切る）
+    const c = [[0, -8], [16, -8], [16, 8], [0, 8], [0, 4], [12, 4], [12, -4], [0, -4]];
+    const building: Building = {
+      id: 'c-shape',
+      attrs: {},
+      lod1: [
+        { exterior: ring(c, 10), interiors: [] }, // 上の面
+        { exterior: ring([...c].reverse(), 0), interiors: [] }, // 底
+      ],
+      lod2: [],
+      installations: [],
+      lod3: [],
+      installations3: [],
+    };
+    const scene = new SceneBuilder({ projector: new LocalProjector(center), half: 10, lod: 1, solid: true });
+    expect(scene.addBuilding(building)).toBe(true);
+    const info = await finishForPrint(scene, 10, { scaleDenominator: 1000, baseMm: 0 });
+    expect(info.droppedFaces).toBe(0);
+    const part = scene.parts.roof;
+    expect(part.triangleCount).toBeGreaterThan(0);
+    // 1/1000 なので m の値をそのまま mm として見る。x = 10 より右は残らない
+    let maxX = -Infinity;
+    for (let i = 0; i < part.positions.length; i += 3) maxX = Math.max(maxX, part.positions[i]!);
+    expect(maxX).toBeCloseTo(10, 4);
+    const pos = Float32Array.from(part.positions);
+    expect(countOpenEdges(pos, part.indices)).toBe(0);
+    // 上下の帯（各 10 × 4 m）が、高さ 10 m の2つの閉じた形として残る：体積 2 × 400
+    const zUp = new Float32Array(pos.length);
+    for (let i = 0; i < pos.length; i += 3) {
+      zUp[i] = pos[i]!;
+      zUp[i + 1] = -pos[i + 2]!;
+      zUp[i + 2] = pos[i + 1]!;
+    }
+    const list = pieces(zUp);
+    expect(list.length).toBe(2);
+    for (const p of list) expect(p.volume).toBeCloseTo(400, 1);
+  });
+
+  it('上から見てごく小さな屋根の面（10 cm 角未満）は、くずれた面として数えずに省く', async () => {
+    const center = { lat: 35.68, lon: 139.76 };
+    const m = metersPerDegree(center.lat);
+    const ring = (pts: number[][], h: number) =>
+      pts.flatMap(([x, z]) => [center.lat - z! / m.lat, center.lon + x! / m.lon, h]);
+    const square = (x0: number, z0: number, s: number) => [[x0, z0], [x0 + s, z0], [x0 + s, z0 + s], [x0, z0 + s]];
+    const building: Building = {
+      id: 'tiny-roof',
+      attrs: {},
+      lod1: [],
+      lod2: [
+        { kind: 'roof', polygon: { exterior: ring(square(-4, -4, 8), 10), interiors: [] } },
+        // 5 cm 角の小さな屋根の面（飾りなど）
+        { kind: 'roof', polygon: { exterior: ring(square(5, 5, 0.05), 12), interiors: [] } },
+        { kind: 'ground', polygon: { exterior: ring(square(-4, -4, 8).reverse(), 0), interiors: [] } },
+      ],
+      installations: [],
+      lod3: [],
+      installations3: [],
+    };
+    const scene = new SceneBuilder({ projector: new LocalProjector(center), half: 10, lod: 2, solid: true });
+    expect(scene.addBuilding(building)).toBe(true);
+    const info = await finishForPrint(scene, 10, { scaleDenominator: 1000, baseMm: 0 });
+    expect(info.droppedFaces).toBe(0);
+    expect(scene.parts.roof.triangleCount).toBe(12);
   });
 });
