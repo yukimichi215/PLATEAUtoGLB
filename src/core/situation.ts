@@ -199,8 +199,8 @@ export const SITUATIONS: Situation[] = [
     id: 'city-station',
     kind: 'station',
     label: '都会の駅前',
-    approximation: '建物が多く（密度が高く）、高い建物が多い所',
-    metrics: ['density', 'avgHeight', 'tall31', 'tall60'],
+    approximation: '高い建物が多く、平均の高さが高い所（大きなビルは1棟が大きいので、1 ha あたりの棟数はむしろ少なく出ることがある）',
+    metrics: ['avgHeight', 'tall31', 'tall60', 'density'],
     places: [
       { name: '丸の内（東京駅の西側）', lat: 35.6815, lon: 139.7655, note: '東京駅と高層のオフィスビル' },
       { name: '新宿駅', lat: 35.6882, lon: 139.6988, note: '商業ビルが密集する' },
