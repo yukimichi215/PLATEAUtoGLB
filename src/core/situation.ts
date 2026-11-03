@@ -1,7 +1,8 @@
-// シチュエーション検索：「都会の駅前」や作品のジャンル（ホラーなど）から、向いた地域の候補を出す。
+// シチュエーション検索：「都会の駅前」や作品のジャンル（古い木造の町並みなど）から、向いた地域の候補を出す。
 // 候補の地域は手で選んだ一覧。選んだ地域が本当に向いているかは、切り出した建物の属性
 // （建てた年・構造・用途・高さ・建物の密度）から出した「根拠の数値」で示す。
-// 「さびれた」「ほのぼの」のような性質は PLATEAU のデータにないので、属性での近似であることを画面に出す。
+// 町の雰囲気（「ほのぼの」など）は PLATEAU のデータにないので、属性での近似であることを画面に出す。
+// 一般に公開するので、実在の町を悪く言う名前・説明にしない（候補は「データ上の特徴が近い例」として出す）。
 import type { LatLon } from './geo.js';
 
 /** 根拠の数値の計算に使う、建物1棟の属性（BuildingInfo の一部） */
@@ -223,8 +224,9 @@ export const SITUATIONS: Situation[] = [
     id: 'rural-station',
     kind: 'station',
     label: '田舎の駅前',
-    approximation: '建物がまばらで、低い住宅が中心の所',
-    metrics: ['density', 'avgHeight', 'residential', 'wooden'],
+    approximation:
+      '低い建物と住宅が中心の所（地方都市の駅前は大きな建物が多いので、1 ha あたりの棟数は田舎の駅前のほうが多く出ることがある）',
+    metrics: ['avgHeight', 'residential', 'wooden', 'density'],
     places: [
       { name: '大聖寺駅（石川県加賀市）', lat: 36.3003, lon: 136.3143, note: '小さな町の駅前' },
       { name: '茅野駅（長野県茅野市）', lat: 35.995, lon: 138.1522, note: '高原の町の駅前' },
@@ -234,11 +236,11 @@ export const SITUATIONS: Situation[] = [
   {
     id: 'horror',
     kind: 'genre',
-    label: 'ホラー（さびれた町・古い木造の家）',
-    approximation: '「さびれた」「廃屋」はデータにないので、古い建物と木造の多さ、建物のまばらさで近似',
-    metrics: ['old', 'wooden', 'density', 'avgHeight'],
+    label: '古い木造の町並み（ホラー・時代もの向き）',
+    approximation: '古い建物と木造の建物の多さで近似（雰囲気そのものはデータにない）',
+    metrics: ['old', 'wooden', 'avgHeight'],
     places: [
-      { name: 'ひがし茶屋街（金沢市東山）', lat: 36.5714, lon: 136.6669, note: '古い木造の町並み' },
+      { name: 'ひがし茶屋街（金沢市東山）', lat: 36.5714, lon: 136.6669, note: '古い木造の町並みが残る' },
       { name: 'ペリーロード付近（下田市三丁目）', lat: 34.6679, lon: 138.9451, note: '古い家が残る港町' },
       { name: '旧城下町（加賀市大聖寺）', lat: 36.3047, lon: 136.3125, note: '古い家と寺が多い' },
     ],

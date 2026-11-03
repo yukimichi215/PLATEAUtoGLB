@@ -240,7 +240,8 @@ situationSelect.addEventListener('change', () => {
   const s = SITUATIONS.find((x) => x.id === situationSelect.value);
   situationPlaces.replaceChildren();
   situationNote.textContent = s
-    ? `目安：${s.approximation}。候補を選んで作ると、できあがりに根拠の数値（建物の属性から出した近似）を出します。`
+    ? `目安：${s.approximation}。下の候補は、特定の町の評価ではなく、データ上の特徴（古さ・構造など）が近い例です。` +
+      '候補を選んで作ると、できあがりに根拠の数値（建物の属性から出した近似）を出します。'
     : '';
   if (!s) return;
   for (const p of s.places) {
@@ -260,7 +261,7 @@ function showEvidence(situation: Situation | null, character: GenerateStats['cha
   evidenceList.replaceChildren();
   if (!situation) return;
   evidenceTitle.textContent = `「${situation.label}」に向いているかの目安`;
-  evidenceNote.textContent = `PLATEAU の建物の属性から出した近似です（${situation.approximation}）。データにない性質（「さびれた」など）そのものは分かりません。`;
+  evidenceNote.textContent = `PLATEAU の建物の属性から出した近似です（${situation.approximation}）。町の雰囲気そのものはデータにないので分かりません。`;
   for (const e of situationEvidence(situation, character)) {
     const dt = document.createElement('dt');
     dt.textContent = e.label;
