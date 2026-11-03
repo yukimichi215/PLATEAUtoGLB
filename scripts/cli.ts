@@ -36,11 +36,12 @@ const { values } = parseArgs({
     'min-mm': { type: 'string', default: '0.8' },
     /** 建物の高さだけを何倍にするか（1〜3） */
     'height-scale': { type: 'string', default: '1' },
+    separate: { type: 'boolean', default: false },
   },
 });
 
 if (!values.lat || !values.lon) {
-  console.error('使い方: npm run cli -- --lat <緯度> --lon <経度> [--size 300] [--lod 1|2|3] [--installations] [--format glb,obj,stl] [--print [--scale 1000 | --fit-mm 100] [--base-mm 3] [--min-mm 0.8]] [--height-scale 1.5] [--name 名前]');
+  console.error('使い方: npm run cli -- --lat <緯度> --lon <経度> [--size 300] [--lod 1|2|3] [--installations] [--format glb,obj,stl] [--print [--scale 1000 | --fit-mm 100] [--base-mm 3] [--min-mm 0.8]] [--height-scale 1.5] [--separate] [--name 名前]');
   process.exit(1);
 }
 
@@ -112,6 +113,7 @@ const req = {
   includeGround: !values['no-ground'],
   placeName: values.name,
   heightScale: Number(values['height-scale']),
+  separateBuildings: values.separate,
   print: values.print
     ? values['fit-mm'] !== undefined
       ? { fitSideMm: Number(values['fit-mm']), baseMm: Number(values['base-mm']), minFeatureMm: Number(values['min-mm']) }

@@ -1,7 +1,7 @@
 // GLB 以外の形式（OBJ・STL）での書き出しと、出典の文章と一緒に1つにまとめる zip。
 // OBJ・STL はファイルの中に出典を書ききれない（STL はほぼ書けない）ので、必ずクレジットの文章ファイルと一緒に zip で出す。
 import { GROUPS, MATERIALS, srgbToLinear } from './glb.js';
-import type { MeshPart, PartName } from './scene.js';
+import type { MeshPart, ModelPiece, PartName } from './scene.js';
 
 /** OBJ の材質名（.mtl の中の名前。どのソフトでも読めるよう英字にする） */
 const MTL_IDS: Record<PartName, string> = {
@@ -28,13 +28,31 @@ function num(v: number): string {
   return Object.is(r, -0) ? '0' : String(r);
 }
 
+/** 部品ごとに、使う種類と三角形の集まりを並べる（GLB と同じ順） */
+function* piecePartsOf(pieces: ModelPiece[]): Generator<{ piece: ModelPiece; partName: PartName; part: MeshPart }> {
+  for (const group of GROUPS) {
+    for (const piece of pieces) {
+      if (piece.group !== group.name) continue;
+      for (const partName of group.parts) {
+        const part = piece.parts[partName];
+        if (part.triangleCount > 0) yield { piece, partName, part };
+      }
+    }
+  }
+}
+
+/** OBJ の o の名前（空白を含むと読めないソフトがあるので _ にする） */
+function objName(name: string): string {
+  return name.replace(/\s+/g, '_') || 'object';
+}
+
 /**
  * OBJ（文字のファイル）にする。単位・向きは GLB と同じ（メートル、+Y が上、-Z が北）。
- * 部品は GLB と同じ名前（Buildings・Roads・Ground）の `o` に分け、材質は .mtl で色を付ける。
- * 同じ位置の頂点は1つにまとめる（Blender などで形がつながって見えるように）。
+ * 部品は GLB と同じ名前（Buildings・Roads・Ground、建物を1棟ずつ分けたときは建物の ID）の `o` に分け、
+ * 材質は .mtl で色を付ける。同じ位置の頂点は1つにまとめる（Blender などで形がつながって見えるように）。
  */
 export function toObj(
-  parts: Record<PartName, MeshPart>,
+  pieces: ModelPiece[],
   credit: string,
   mtlFileName: string,
   unitNote = '単位：メートル。+Y が上、-Z が北。範囲の中心が原点、地面が高さ 0',
@@ -46,30 +64,29 @@ export function toObj(
   const ids = new Map<string, number>();
   const vertexLines: string[] = [];
   const faceLines: string[] = [];
-  for (const group of GROUPS) {
-    const used = group.parts.filter((p) => parts[p].triangleCount > 0);
-    if (used.length === 0) continue;
-    faceLines.push(`o ${group.name}`);
-    for (const partName of used) {
-      const part = parts[partName];
-      faceLines.push(`usemtl ${MTL_IDS[partName]}`);
-      const local: number[] = new Array(part.vertexCount);
-      const p = part.positions;
-      for (let i = 0; i < part.vertexCount; i++) {
-        const key = `${num(p[i * 3]!)} ${num(p[i * 3 + 1]!)} ${num(p[i * 3 + 2]!)}`;
-        let id = ids.get(key);
-        if (id === undefined) {
-          id = ids.size + 1;
-          ids.set(key, id);
-          vertexLines.push(`v ${key}`);
-        }
-        local[i] = id;
+  let current: ModelPiece | null = null;
+  for (const { piece, partName, part } of piecePartsOf(pieces)) {
+    if (piece !== current) {
+      faceLines.push(`o ${objName(piece.name)}`);
+      current = piece;
+    }
+    faceLines.push(`usemtl ${MTL_IDS[partName]}`);
+    const local: number[] = new Array(part.vertexCount);
+    const p = part.positions;
+    for (let i = 0; i < part.vertexCount; i++) {
+      const key = `${num(p[i * 3]!)} ${num(p[i * 3 + 1]!)} ${num(p[i * 3 + 2]!)}`;
+      let id = ids.get(key);
+      if (id === undefined) {
+        id = ids.size + 1;
+        ids.set(key, id);
+        vertexLines.push(`v ${key}`);
       }
-      const idx = part.indices;
-      for (let t = 0; t < idx.length; t += 3) {
-        // 丸めで頂点が重なった（面積ほぼ 0 の）三角形も、三角形の数を GLB・STL とそろえるため残す
-        faceLines.push(`f ${local[idx[t]!]!} ${local[idx[t + 1]!]!} ${local[idx[t + 2]!]!}`);
-      }
+      local[i] = id;
+    }
+    const idx = part.indices;
+    for (let t = 0; t < idx.length; t += 3) {
+      // 丸めで頂点が重なった（面積ほぼ 0 の）三角形も、三角形の数を GLB・STL とそろえるため残す
+      faceLines.push(`f ${local[idx[t]!]!} ${local[idx[t + 1]!]!} ${local[idx[t + 2]!]!}`);
     }
   }
   out.push(...vertexLines, ...faceLines);
@@ -77,11 +94,13 @@ export function toObj(
 }
 
 /** OBJ の色の設定（.mtl） */
-export function toMtl(parts: Record<PartName, MeshPart>, credit: string): string {
+export function toMtl(pieces: ModelPiece[], credit: string): string {
   const out: string[] = [comment(credit)];
+  const used = new Set<PartName>();
+  for (const { partName } of piecePartsOf(pieces)) used.add(partName);
   for (const group of GROUPS) {
     for (const partName of group.parts) {
-      if (parts[partName].triangleCount === 0) continue;
+      if (!used.has(partName)) continue;
       const m = MATERIALS[partName];
       out.push('', `# ${m.name}`, `newmtl ${MTL_IDS[partName]}`);
       // GLB の色と同じ見え方にするため、glTF と同じく直線の色の値（linear）で書く
@@ -98,9 +117,9 @@ export function toMtl(parts: Record<PartName, MeshPart>, credit: string): string
  * STL には色がないので、すべての部品を1つの形にまとめる。
  * 先頭の 80 バイト（英数字のみ）に、出典が別のファイルにあることを書く。
  */
-export function toStl(parts: Record<PartName, MeshPart>, header: string, zUp = false): Uint8Array {
+export function toStl(pieces: ModelPiece[], header: string, zUp = false): Uint8Array {
   let count = 0;
-  for (const part of Object.values(parts)) count += part.triangleCount;
+  for (const { part } of piecePartsOf(pieces)) count += part.triangleCount;
   const buf = new ArrayBuffer(84 + count * 50);
   const bytes = new Uint8Array(buf);
   const view = new DataView(buf);
@@ -108,33 +127,30 @@ export function toStl(parts: Record<PartName, MeshPart>, header: string, zUp = f
   for (let i = 0; i < ascii.length; i++) bytes[i] = ascii.charCodeAt(i);
   view.setUint32(80, count, true);
   let o = 84;
-  for (const group of GROUPS) {
-    for (const partName of group.parts) {
-      const part = parts[partName];
-      const p = part.positions;
-      const idx = part.indices;
-      for (let t = 0; t < idx.length; t += 3) {
-        const a = idx[t]! * 3, b = idx[t + 1]! * 3, c = idx[t + 2]! * 3;
-        // 法線は三角形の頂点の並びから計算する
-        const e1 = [p[b]! - p[a]!, p[b + 1]! - p[a + 1]!, p[b + 2]! - p[a + 2]!];
-        const e2 = [p[c]! - p[a]!, p[c + 1]! - p[a + 1]!, p[c + 2]! - p[a + 2]!];
-        let nx = e1[1]! * e2[2]! - e1[2]! * e2[1]!;
-        let ny = e1[2]! * e2[0]! - e1[0]! * e2[2]!;
-        let nz = e1[0]! * e2[1]! - e1[1]! * e2[0]!;
-        const len = Math.hypot(nx, ny, nz) || 1;
-        nx /= len; ny /= len; nz /= len;
-        // +Y が上 → +Z が上：(x, y, z) → (x, -z, y)
-        const put = (x: number, y: number, z: number) => {
-          view.setFloat32(o, x, true);
-          view.setFloat32(o + 4, zUp ? -z : y, true);
-          view.setFloat32(o + 8, zUp ? y : z, true);
-          o += 12;
-        };
-        put(nx, ny, nz);
-        for (const v of [a, b, c]) put(p[v]!, p[v + 1]!, p[v + 2]!);
-        view.setUint16(o, 0, true);
-        o += 2;
-      }
+  for (const { part } of piecePartsOf(pieces)) {
+    const p = part.positions;
+    const idx = part.indices;
+    for (let t = 0; t < idx.length; t += 3) {
+      const a = idx[t]! * 3, b = idx[t + 1]! * 3, c = idx[t + 2]! * 3;
+      // 法線は三角形の頂点の並びから計算する
+      const e1 = [p[b]! - p[a]!, p[b + 1]! - p[a + 1]!, p[b + 2]! - p[a + 2]!];
+      const e2 = [p[c]! - p[a]!, p[c + 1]! - p[a + 1]!, p[c + 2]! - p[a + 2]!];
+      let nx = e1[1]! * e2[2]! - e1[2]! * e2[1]!;
+      let ny = e1[2]! * e2[0]! - e1[0]! * e2[2]!;
+      let nz = e1[0]! * e2[1]! - e1[1]! * e2[0]!;
+      const len = Math.hypot(nx, ny, nz) || 1;
+      nx /= len; ny /= len; nz /= len;
+      // +Y が上 → +Z が上：(x, y, z) → (x, -z, y)
+      const put = (x: number, y: number, z: number) => {
+        view.setFloat32(o, x, true);
+        view.setFloat32(o + 4, zUp ? -z : y, true);
+        view.setFloat32(o + 8, zUp ? y : z, true);
+        o += 12;
+      };
+      put(nx, ny, nz);
+      for (const v of [a, b, c]) put(p[v]!, p[v + 1]!, p[v + 2]!);
+      view.setUint16(o, 0, true);
+      o += 2;
     }
   }
   return bytes;

@@ -1,4 +1,5 @@
 // GLB の検査（Node.js 用。自動テストと verify-glb から使う）。
+import { WebIO } from '@gltf-transform/core';
 import { Box3, Mesh, type Object3D } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 // @ts-expect-error 型定義がない
@@ -13,6 +14,8 @@ export interface GlbReport {
   threeError?: string;
   triangles: number;
   meshes: number;
+  /** 部品のまとまり（Buildings・Roads・Ground）ごとの、メッシュを持つ部品の数（建物を1棟ずつ分けたら棟数） */
+  groups: Record<string, number>;
   size?: { width: number; height: number; depth: number };
   min?: [number, number, number];
   max?: [number, number, number];
@@ -42,6 +45,7 @@ export async function checkGlb(bytes: Uint8Array): Promise<GlbReport> {
     loadedByThree: false,
     triangles: 0,
     meshes: 0,
+    groups: {},
     usesExtensions: v.info?.extensionsUsed ?? [],
     bytes: bytes.byteLength,
   };
@@ -60,6 +64,16 @@ export async function checkGlb(bytes: Uint8Array): Promise<GlbReport> {
         report.triangles += (g.index ? g.index.count : g.attributes.position!.count) / 3;
       }
     });
+    // 部品の数は、glTF のノードの並び（シーン → ルートのノード → まとまり）で数える
+    // （three.js は材質が複数あるメッシュを複数の Mesh に分けるので、そちらでは数えない）
+    const doc = await new WebIO().readBinary(bytes);
+    for (const group of doc.getRoot().listScenes()[0]?.listChildren()[0]?.listChildren() ?? []) {
+      let n = 0;
+      group.traverse((node) => {
+        if (node.getMesh()) n++;
+      });
+      report.groups[group.getName()] = (report.groups[group.getName()] ?? 0) + n;
+    }
     const box = new Box3().setFromObject(gltf.scene);
     const r = (n: number) => Math.round(n * 100) / 100;
     report.min = [r(box.min.x), r(box.min.y), r(box.min.z)];

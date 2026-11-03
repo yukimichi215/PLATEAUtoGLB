@@ -15,7 +15,12 @@ for (const f of files) {
   const bytes = new Uint8Array(readFileSync(f));
   const ext = f.toLowerCase().split('.').pop();
   const report = ext === 'obj' || ext === 'stl' ? checkMesh(ext, bytes) : await checkGlb(bytes);
-  console.log(JSON.stringify({ file: f, ...report }, null, 2));
+  // 建物を1棟ずつ分けた OBJ は部品の名前が多いので、数と最初のいくつかだけ出す
+  const shown =
+    'objects' in report && report.objects.length > 10
+      ? { ...report, objectCount: report.objects.length, objects: [...report.objects.slice(0, 5), '…'] }
+      : report;
+  console.log(JSON.stringify({ file: f, ...shown }, null, 2));
   if (!report.ok) failed = true;
 }
 process.exit(failed ? 1 : 0);

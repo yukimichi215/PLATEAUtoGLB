@@ -14,6 +14,7 @@
    - **高さの強調**：建物の高さだけを 1〜3 倍にする（平らな町でも立体感が出る。幅・奥行き・道路・台座の厚さは変えない）
 3. 使いみちを選ぶ
    - **そのまま**：実物の大きさ（メートル）。Blender などの編集ソフト・PlotBlock 向け
+     「建物を1棟ずつ別の部品にする」を選ぶと、GLB のノード・OBJ の `o` を建物ごとに分ける（名前は PLATEAU の建物 ID。編集ソフトで1棟ずつ選べる。STL は分けない）
    - **3D プリンタ用**：縮尺（1/500〜1/10000、または台座の一辺の長さ〔mm〕）と台座の厚さ（mm。0 で台座なし）を決める。
      建物は屋根の面を真下に押し出した形に作り直し、道路（厚さ 0.4 mm の板）・台座と一緒に、穴やすき間のない1つの立体にまとめる
      （付属物・窓・扉は細かすぎて印刷できないので入れない。範囲からはみ出した部分は切り落とし、台座はちょうど切り出した正方形）
@@ -34,7 +35,7 @@
   台座の上面が高さ 0。建物・道路の下端は台座の厚さの半分まで食い込ませ、台座とつなげる
 - OBJ は同じ位置の頂点を1つにまとめ、部品（`o`）は GLB と同じ名前。STL はバイナリ形式で、先頭に出典が別ファイルにある旨を英字で書く
 - 建物の底の面は省いて三角形を減らす。模様（テクスチャ）は使わず、壁・屋根・付属物・道路・地面の色分け
-- 中身は「Buildings」「Roads」「Ground」の3つの部品
+- 中身は「Buildings」「Roads」「Ground」の3つの部品（建物を1棟ずつ分けたときは、Buildings の下に建物ごとの部品）
 - GLB は `asset.copyright` と `extras.plateau`、OBJ・.mtl は先頭のコメントに出典（自治体・年度・データ名・ライセンス・入手先）と「加工して作成」の旨を記録
 
 まだできないこと：地形（坂・高低差。建物は地面の高さ 0 にそろえて並べる）、橋・木など、建物の模様・窓（PLATEAU の写真の模様は一部の地域にしかなく粗いため使わない。窓の形のデータはほぼない）、地図で場所を選ぶこと。
@@ -86,8 +87,9 @@ npm run dev
 | `npm run app:dev` / `npm run app:build` | Windows アプリ版の起動・ビルド（Rust と Tauri の準備が要る。通常は GitHub の自動ビルドで作る） |
 | `npm run cli -- … --print --scale 1000 --base-mm 3`（または `--fit-mm 100`） | 3D プリンタ用（縮尺・台座・閉じた形）で作る |
 | `npm run cli -- … --height-scale 1.5` | 建物の高さだけを 1.5 倍にする（1〜3） |
+| `npm run cli -- … --separate` | 建物を1棟ずつ別の部品にする（GLB・OBJ。3D プリンタ用では使わない） |
 | `npm run cli -- … --print --min-mm 0.8` | 3D プリンタ用で、印刷すると 0.8 mm より細い建物・道路を外す（0〜10。既定 0.8、0 で外さない） |
-| `npm run verify -- out/xxx.glb out/xxx.obj out/xxx.stl` | GLB を glTF Validator と three.js で、OBJ・STL を three.js の OBJLoader・STLLoader で検査し、外形・三角形の数を表示。STL は印刷できる形か（開いた辺・3つ以上の面が共有する辺・部品の数・体積が正か・台座から浮いた部品）も表示 |
+| `npm run verify -- out/xxx.glb out/xxx.obj out/xxx.stl` | GLB を glTF Validator と three.js で、OBJ・STL を three.js の OBJLoader・STLLoader で検査し、外形・三角形の数・部品の数（GLB は Buildings・Roads・Ground ごと）を表示。STL は印刷できる形か（開いた辺・3つ以上の面が共有する辺・部品の数・体積が正か・台座から浮いた部品）も表示 |
 
 PR を出す前の検証：`npm run typecheck`、`npm test`、`npm run build` がすべて通ること。
 GLB の出力を変えたときは、さらに実データで `npm run cli` と `npm run verify` を実行し、見た目に関わる変更は画面のプレビューのスクリーンショットで確かめる。

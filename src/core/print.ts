@@ -1,5 +1,5 @@
 // 3Dプリンタ用の仕上げ：縮尺を決め、台座を敷き、閉じた形の柱の下端・道路の高さを決める。
-import { MeshPart, SOLID_BOTTOM, SOLID_ROAD_TOP, type PartName, type SceneBuilder } from './scene.js';
+import { MeshPart, SOLID_BOTTOM, SOLID_ROAD_TOP, type ModelPiece, type PartName, type Parts, type SceneBuilder } from './scene.js';
 import { minWidth2d } from './geometry.js';
 import { box, type Solid } from './solid.js';
 import { unionSolids, type UnionGroup } from './union.js';
@@ -146,8 +146,8 @@ function xzOf(s: Solid, half: number): number[] {
 }
 
 /** 大きさを k 倍した部品の写し */
-export function scaleParts(parts: Record<PartName, MeshPart>, k: number): Record<PartName, MeshPart> {
-  const out = {} as Record<PartName, MeshPart>;
+export function scaleParts(parts: Parts, k: number): Parts {
+  const out = {} as Parts;
   for (const [name, part] of Object.entries(parts) as [PartName, MeshPart][]) {
     const copy = new MeshPart();
     copy.positions = part.positions.map((v) => v * k);
@@ -156,4 +156,14 @@ export function scaleParts(parts: Record<PartName, MeshPart>, k: number): Record
     out[name] = copy;
   }
   return out;
+}
+
+/** 大きさを k 倍した部品の一覧の写し（同じ parts を共有する部品は、写しも共有する） */
+export function scalePieces(pieces: ModelPiece[], k: number): ModelPiece[] {
+  const copies = new Map<Parts, Parts>();
+  return pieces.map((p) => {
+    let parts = copies.get(p.parts);
+    if (!parts) copies.set(p.parts, (parts = scaleParts(p.parts, k)));
+    return { ...p, parts };
+  });
 }
