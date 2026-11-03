@@ -171,7 +171,7 @@ export const en: Record<MessageKey, string> = {
   'stats.size': 'Size (width × depth × height)',
 
   'footer.data':
-    'Building and road data are processed from the 3D city models of MLIT Project PLATEAU (copyright held by each municipality). This tool is not made by MLIT or any municipality. Address search uses the GSI (Geospatial Information Authority of Japan) address search, and the map for choosing the area uses GSI Tiles.',
+    'Building and road data are processed from the 3D city models of MLIT Project PLATEAU (copyright held by each municipality). This tool was not created by MLIT or any municipality. Address search uses the GSI (Geospatial Information Authority of Japan) address search, and the map for choosing the area uses GSI Tiles.',
   'footer.unofficial':
     'This is an unofficial tool made by an individual. It is not affiliated with MLIT, any municipality, or GSI.',
   'footer.privacy':

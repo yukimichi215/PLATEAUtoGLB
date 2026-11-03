@@ -166,5 +166,10 @@ describe('日本語・英語の切り替え', () => {
     expect(enPart).toContain('"3D City Model (Project PLATEAU) 千代田区 (FY2025)"');
     expect(enPart).toContain('- Description');
     expect(enPart).toContain('- Processed');
+    expect(enPart).toContain('  Source URL: https://example.com/a');
+    expect(enPart).toContain('This was not created by');
+    expect(res.shortEn).toBe(
+      'Processed from "3D City Model (Project PLATEAU) 千代田区 (FY2025)" (Ministry of Land, Infrastructure, Transport and Tourism) (Public Data License (Version 1.0) (compatible with CC BY 4.0))',
+    );
   });
 });
