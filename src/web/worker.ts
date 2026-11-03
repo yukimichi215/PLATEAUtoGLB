@@ -1,6 +1,8 @@
 /// <reference lib="webworker" />
 // 重い処理（データの取得・読み取り・GLB 作成）を画面とは別の場所で動かし、画面が固まらないようにする。
+import manifoldWasmUrl from 'manifold-3d/manifold.wasm?url';
 import type { SourceFile } from '../core/catalog.js';
+import { setManifoldWasmUrl } from '../core/union.js';
 import {
   defaultFetchJson,
   downloadFiles,
@@ -33,6 +35,8 @@ export type WorkerResponse =
   | { type: 'error'; message: string };
 
 const CACHE_NAME = 'plateau-citygml-v1';
+// 3Dプリンタ用の形をまとめる計算（manifold.wasm）の置き場所。Vite が出力に含めて場所を教える
+setManifoldWasmUrl(manifoldWasmUrl);
 const ctx = self as unknown as DedicatedWorkerGlobalScope;
 
 function post(msg: WorkerResponse, transfer: Transferable[] = []): void {
