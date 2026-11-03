@@ -1,6 +1,9 @@
-# 自動ビルド（規則 CLAUDE.md §6 に従う）
+# 自動ビルドと公開（規則 CLAUDE.md §6 に従う）
 # ・作業ブランチ・PR：検査とビルドができるかの確認だけ（できたファイルは保存しない）
-# ・main に取り込まれたときも同じ確認だけ（ブラウザ版に一本化したので、配るファイルは作らない）
+# ・main に取り込まれたとき：同じ確認のあと、GitHub Pages に公開する
+#   （保存するのは Pages 用の成果物1つだけ。保存期間は1日。公開したら役目は終わり）
+# 公式アクションは版をコミットで固定する（右のコメントが版）
+# 画面は相対パス（vite の base: './'）で作るので、Pages の住所を調べる手順（configure-pages）は使わない
 name: build
 
 on:
@@ -10,22 +13,21 @@ on:
   pull_request:
     paths-ignore: ['**.md', 'docs/**']
 
-# 同じブランチに新しい push が来たら、動いている古いビルドは止める
-concurrency:
-  group: build-${{ github.ref }}
-  cancel-in-progress: true
-
 permissions:
   contents: read
 
 jobs:
   check:
     name: 検査（型チェック・テスト・画面のビルド）
+    # 同じブランチに新しい push が来たら、動いている古い検査は止める
+    concurrency:
+      group: build-${{ github.ref }}
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: npm
@@ -33,3 +35,48 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+
+  # main への push のときだけ：公開用のファイルを作って Pages 用に渡す
+  pages-build:
+    name: 公開用のファイルを作る
+    # 公開は途中で止めると Pages が中途半端になるので止めない（新しいものは前の公開が終わってから順に動く）
+    concurrency:
+      group: pages-build
+      cancel-in-progress: false
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run build
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: dist
+          retention-days: 1
+
+  # 公開する。書き込みの権限はこのジョブだけに付ける
+  pages-deploy:
+    name: GitHub Pages に公開する
+    # 公開は途中で止めると Pages が中途半端になるので止めない（新しいものは前の公開が終わってから順に動く）
+    concurrency:
+      group: pages-deploy
+      cancel-in-progress: false
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: pages-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
