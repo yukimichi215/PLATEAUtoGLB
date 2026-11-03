@@ -38,24 +38,42 @@ export class AreaMap {
   private closed = false;
   private dragStart: L.LatLng | null = null;
 
+  private attribution = '';
+
   constructor(
     el: HTMLElement,
     private onChange: (s: DrawState) => void,
+    attributionLabel: string,
   ) {
     this.map = L.map(el, { minZoom: MAP_TILES.minZoom, maxZoom: MAP_TILES.maxZoom, zoomSnap: 0.5 });
     this.map.attributionControl.setPrefix('<a href="https://leafletjs.com" target="_blank" rel="noopener noreferrer">Leaflet</a>');
     L.tileLayer(MAP_TILES.url, {
-      attribution: MAP_TILES.attribution,
       minZoom: MAP_TILES.minZoom,
       maxZoom: MAP_TILES.maxZoom,
     }).addTo(this.map);
     this.layer.addTo(this.map);
+    this.setAttributionLabel(attributionLabel);
     this.map.on('click', (ev: L.LeafletMouseEvent) => this.onClick(ev));
     // 四角は、押したまま動かして描く（指でも描けるように pointer の出来事を使う）
     const c = this.map.getContainer();
     c.addEventListener('pointerdown', (ev) => this.onPointerDown(ev));
     c.addEventListener('pointermove', (ev) => this.onPointerMove(ev));
     c.addEventListener('pointerup', (ev) => this.onPointerUp(ev));
+  }
+
+  /** 地図の右下の出典（言語を切り替えたときにも呼ぶ） */
+  setAttributionLabel(label: string): void {
+    const a = document.createElement('a');
+    a.href = MAP_TILES.attributionUrl;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.textContent = label;
+    const html = a.outerHTML;
+    if (html === this.attribution) return;
+    const control = this.map.attributionControl;
+    if (this.attribution) control.removeAttribution(this.attribution);
+    control.addAttribution(html);
+    this.attribution = html;
   }
 
   /** 選んだ場所を中心に地図を出す（正方形の一辺 m） */

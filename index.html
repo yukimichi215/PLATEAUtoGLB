@@ -7,25 +7,32 @@
     <link rel="stylesheet" href="/src/web/style.css" />
   </head>
   <body>
+    <!-- 画面の文言は src/web/i18n/ja.ts・en.ts（data-i18n のキー）。ここの日本語は、読み込み前に見える仮の文言 -->
     <header class="top">
       <div class="top-row">
         <h1>PLATEAUtoGLB</h1>
-        <nav id="donate" class="donate" aria-label="このツールを応援する" hidden></nav>
+        <div class="top-tools">
+          <nav id="donate" class="donate" data-i18n-attr="aria-label:donate.aria" aria-label="このツールを応援する" hidden></nav>
+          <select id="lang-select" class="lang-select" data-i18n-attr="aria-label:lang.label" aria-label="表示する言語">
+            <option value="ja">日本語</option>
+            <option value="en">English</option>
+          </select>
+        </div>
       </div>
-      <p class="lead">住所や地名から、その周りの建物を 3D モデル（GLB・OBJ・STL）にします。3D プリンタ・編集ソフト・PlotBlock などで使えます（データ：国土交通省 PLATEAU）。</p>
+      <p class="lead" data-i18n="app.lead">住所や地名から、その周りの建物を 3D モデル（GLB・OBJ・STL）にします。3D プリンタ・編集ソフト・PlotBlock などで使えます（データ：国土交通省 PLATEAU）。</p>
     </header>
 
     <main>
       <section class="card" aria-labelledby="h-place">
-        <h2 id="h-place"><span class="step">1</span>場所を探す</h2>
+        <h2 id="h-place"><span class="step">1</span><span data-i18n="step1.title">場所を探す</span></h2>
         <form id="search-form" class="row">
-          <input id="search-input" type="search" placeholder="例：東京駅、大阪市北区梅田、35.6812, 139.7671" autocomplete="off" required />
-          <button type="submit" id="search-btn">検索</button>
+          <input id="search-input" type="search" data-i18n-attr="placeholder:search.placeholder" placeholder="例：東京駅、大阪市北区梅田、35.6812, 139.7671" autocomplete="off" required />
+          <button type="submit" id="search-btn" data-i18n="search.button">検索</button>
         </form>
-        <p class="hint">住所・地名・駅名のほか、「緯度, 経度」でも指定できます。</p>
+        <p class="hint" data-i18n="search.hint">住所・地名・駅名のほか、「緯度, 経度」でも指定できます。</p>
         <details class="situation">
-          <summary>シチュエーションから探す（都会の駅前・古い木造の町並み など）</summary>
-          <label>シチュエーション
+          <summary data-i18n="situation.summary">シチュエーションから探す（都会の駅前・古い木造の町並み など）</summary>
+          <label><span data-i18n="situation.label">シチュエーション</span>
             <select id="situation-select"></select>
           </label>
           <p id="situation-note" class="hint"></p>
@@ -36,73 +43,69 @@
       </section>
 
       <section class="card" aria-labelledby="h-settings">
-        <h2 id="h-settings"><span class="step">2</span>切り出し方を選ぶ</h2>
+        <h2 id="h-settings"><span class="step">2</span><span data-i18n="step2.title">切り出し方を選ぶ</span></h2>
         <fieldset class="area-mode">
-          <legend>範囲の選び方</legend>
-          <label class="inline"><input type="radio" name="area" value="square" checked /> 正方形（選んだ場所が中心）</label>
-          <label class="inline"><input type="radio" name="area" value="rect" /> 地図で四角に囲む</label>
-          <label class="inline"><input type="radio" name="area" value="polygon" /> 地図で自由な形に囲む</label>
+          <legend data-i18n="area.legend">範囲の選び方</legend>
+          <label class="inline"><input type="radio" name="area" value="square" checked /> <span data-i18n="area.square">正方形（選んだ場所が中心）</span></label>
+          <label class="inline"><input type="radio" name="area" value="rect" /> <span data-i18n="area.rect">地図で四角に囲む</span></label>
+          <label class="inline"><input type="radio" name="area" value="polygon" /> <span data-i18n="area.polygon">地図で自由な形に囲む</span></label>
         </fieldset>
-        <p id="map-need-place" class="hint">地図は、手順 1 で場所を選ぶと出ます。</p>
+        <p id="map-need-place" class="hint" data-i18n="map.needPlace">地図は、手順 1 で場所を選ぶと出ます。</p>
         <div id="map-wrap" class="map-wrap" hidden>
-          <div id="map" class="map" aria-label="範囲を選ぶ地図"></div>
+          <div id="map" class="map" data-i18n-attr="aria-label:map.aria" aria-label="範囲を選ぶ地図"></div>
           <div id="map-tools" class="row map-tools" hidden>
-            <button type="button" id="map-undo">1つ戻す</button>
-            <button type="button" id="map-finish">囲み終える</button>
-            <button type="button" id="map-clear">描き直す</button>
+            <button type="button" id="map-undo" data-i18n="map.undo">1つ戻す</button>
+            <button type="button" id="map-finish" data-i18n="map.finish">囲み終える</button>
+            <button type="button" id="map-clear" data-i18n="map.clear">描き直す</button>
           </div>
           <p id="map-hint" class="hint"></p>
         </div>
         <div class="grid">
-          <label id="size-label">切り出す広さ（正方形の一辺）
+          <label id="size-label"><span data-i18n="size.label">切り出す広さ（正方形の一辺）</span>
             <select id="size">
-              <option value="50">50 m（建物数棟）</option>
-              <option value="100">100 m</option>
-              <option value="150">150 m</option>
-              <option value="200">200 m</option>
-              <option value="300" selected>300 m</option>
-              <option value="500">500 m</option>
-              <option value="1000">1000 m（重い）</option>
+              <option value="50" data-i18n="size.50">50 m（建物数棟）</option>
+              <option value="100" data-i18n="size.m" data-i18n-n="100">100 m</option>
+              <option value="150" data-i18n="size.m" data-i18n-n="150">150 m</option>
+              <option value="200" data-i18n="size.m" data-i18n-n="200">200 m</option>
+              <option value="300" data-i18n="size.m" data-i18n-n="300" selected>300 m</option>
+              <option value="500" data-i18n="size.m" data-i18n-n="500">500 m</option>
+              <option value="1000" data-i18n="size.1000">1000 m（重い）</option>
             </select>
           </label>
-          <label>高さの強調（建物の高さだけ何倍にするか）
+          <label><span data-i18n="height.label">高さの強調（建物の高さだけ何倍にするか）</span>
             <select id="height-scale">
-              <option value="1" selected>そのまま（1 倍）</option>
-              <option value="1.25">1.25 倍</option>
-              <option value="1.5">1.5 倍</option>
-              <option value="2">2 倍</option>
-              <option value="2.5">2.5 倍</option>
-              <option value="3">3 倍</option>
+              <option value="1" data-i18n="height.1" selected>そのまま（1 倍）</option>
+              <option value="1.25" data-i18n="height.times" data-i18n-n="1.25">1.25 倍</option>
+              <option value="1.5" data-i18n="height.times" data-i18n-n="1.5">1.5 倍</option>
+              <option value="2" data-i18n="height.times" data-i18n-n="2">2 倍</option>
+              <option value="2.5" data-i18n="height.times" data-i18n-n="2.5">2.5 倍</option>
+              <option value="3" data-i18n="height.times" data-i18n-n="3">3 倍</option>
             </select>
           </label>
           <fieldset>
-            <legend>建物の細かさ</legend>
-            <label class="inline"><input type="radio" name="detail" value="box" checked /> 箱型（いちばん軽い）</label>
-            <label class="inline"><input type="radio" name="detail" value="roof" /> 屋根の形あり</label>
-            <label class="inline"><input type="radio" name="detail" value="roofPlus" /> <span>屋根の形＋付属物（重い）<span class="print-same" hidden>（3D プリンタ用では「屋根の形あり」と同じ）</span></span></label>
-            <label class="inline"><input type="radio" name="detail" value="lod3" /> <span>窓・扉まで＋付属物（とても重い。一部の地域だけ）<span class="print-same" hidden>（3D プリンタ用では「屋根の形あり」と同じ）</span></span></label>
+            <legend data-i18n="detail.legend">建物の細かさ</legend>
+            <label class="inline"><input type="radio" name="detail" value="box" checked /> <span data-i18n="detail.box">箱型（いちばん軽い）</span></label>
+            <label class="inline"><input type="radio" name="detail" value="roof" /> <span data-i18n="detail.roof">屋根の形あり</span></label>
+            <label class="inline"><input type="radio" name="detail" value="roofPlus" /> <span><span data-i18n="detail.roofPlus">屋根の形＋付属物（重い）</span><span class="print-same" data-i18n="detail.printSame" hidden>（3D プリンタ用では「屋根の形あり」と同じ）</span></span></label>
+            <label class="inline"><input type="radio" name="detail" value="lod3" /> <span><span data-i18n="detail.lod3">窓・扉まで＋付属物（とても重い。一部の地域だけ）</span><span class="print-same" data-i18n="detail.printSame" hidden>（3D プリンタ用では「屋根の形あり」と同じ）</span></span></label>
           </fieldset>
           <fieldset>
-            <legend>建物以外</legend>
-            <label class="inline"><input type="checkbox" id="roads" checked /> 道路</label>
-            <label class="inline"><input type="checkbox" id="ground" checked /> 地面の板</label>
+            <legend data-i18n="other.legend">建物以外</legend>
+            <label class="inline"><input type="checkbox" id="roads" checked /> <span data-i18n="other.roads">道路</span></label>
+            <label class="inline"><input type="checkbox" id="ground" checked /> <span data-i18n="other.ground">地面の板</span></label>
           </fieldset>
         </div>
-        <p class="hint">
-          下ほど細かく、ファイルが大きくなります。スマホ向けには「箱型」がおすすめです。
-          付属物はベランダ・ひさし・屋上の設備などで、データのない地域もあります。
-          窓・扉まであるデータ（LOD3）は沼津駅前・虎ノ門など一部の建物だけで、ない建物は屋根の形（付属物あり）・箱型で代わりに作ります（その数を表示します）。3D プリンタ用では、付属物・窓・扉は細かすぎるので入れません。
-        </p>
+        <p class="hint" data-i18n="detail.hint">下ほど細かく、ファイルが大きくなります。スマホ向けには「箱型」がおすすめです。付属物はベランダ・ひさし・屋上の設備などで、データのない地域もあります。窓・扉まであるデータ（LOD3）は沼津駅前・虎ノ門など一部の建物だけで、ない建物は屋根の形（付属物あり）・箱型で代わりに作ります（その数を表示します）。3D プリンタ用では、付属物・窓・扉は細かすぎるので入れません。</p>
         <fieldset class="use">
-          <legend>使いみち</legend>
-          <label class="inline"><input type="radio" name="use" value="model" checked /> そのまま（実物の大きさ。編集ソフト・PlotBlock 向け）</label>
-          <label class="inline"><input type="radio" name="use" value="print" /> 3D プリンタ用（縮尺・台座・印刷できる閉じた形）</label>
+          <legend data-i18n="use.legend">使いみち</legend>
+          <label class="inline"><input type="radio" name="use" value="model" checked /> <span data-i18n="use.model">そのまま（実物の大きさ。編集ソフト・PlotBlock 向け）</span></label>
+          <label class="inline"><input type="radio" name="use" value="print" /> <span data-i18n="use.print">3D プリンタ用（縮尺・台座・印刷できる閉じた形）</span></label>
         </fieldset>
         <div id="model-options" class="model-options">
-          <label class="inline"><input type="checkbox" id="separate" /> 建物を1棟ずつ別の部品にする（Blender などで1棟ずつ選べる。GLB・OBJ。GLB には建物の名前・用途・建てた年・高さも入れる。ファイルが少し大きく、表示が少し重くなります）</label>
+          <label class="inline"><input type="checkbox" id="separate" /> <span data-i18n="separate.label">建物を1棟ずつ別の部品にする（Blender などで1棟ずつ選べる。GLB・OBJ。GLB には建物の名前・用途・建てた年・高さも入れる。ファイルが少し大きく、表示が少し重くなります）</span></label>
         </div>
         <div id="print-options" class="grid print-options" hidden>
-          <label>縮尺
+          <label><span data-i18n="scale.label">縮尺</span>
             <select id="scale">
               <option value="500">1/500</option>
               <option value="1000" selected>1/1000</option>
@@ -110,26 +113,26 @@
               <option value="2500">1/2500</option>
               <option value="5000">1/5000</option>
               <option value="10000">1/10000</option>
-              <option value="fit">台座の一辺の長さで決める</option>
+              <option value="fit" data-i18n="scale.fit">台座の一辺の長さで決める</option>
             </select>
           </label>
-          <label id="fit-label" hidden>台座の一辺の長さ（mm）
+          <label id="fit-label" hidden><span data-i18n="fit.label">台座の一辺の長さ（mm）</span>
             <input id="fit-mm" type="number" min="10" max="2000" step="1" value="100" />
           </label>
-          <label>台座の厚さ（mm。0 で台座なし）
+          <label><span data-i18n="base.label">台座の厚さ（mm。0 で台座なし）</span>
             <input id="base-mm" type="number" min="0" max="50" step="0.5" value="3" />
           </label>
-          <label>細かすぎる部分を外す（印刷するとこの mm より細い建物・道路。0 で外さない）
+          <label><span data-i18n="minmm.label">細かすぎる部分を外す（印刷するとこの mm より細い建物・道路。0 で外さない）</span>
             <input id="min-mm" type="number" min="0" max="10" step="0.1" value="0.8" />
           </label>
         </div>
         <p id="print-hint" class="hint" hidden></p>
-        <p class="hint">中心が範囲の中にある建物を入れます。<span id="overhang-hint">大きな建物は範囲から少しはみ出すことがあります。</span>地形（坂や高低差）はまだ入りません。</p>
+        <p class="hint"><span data-i18n="area.hint">中心が範囲の中にある建物を入れます。</span><span id="overhang-hint" data-i18n="area.overhang">大きな建物は範囲から少しはみ出すことがあります。</span><span data-i18n="area.noTerrain">地形（坂や高低差）はまだ入りません。</span></p>
       </section>
 
       <section class="card" aria-labelledby="h-make">
-        <h2 id="h-make"><span class="step">3</span>3D モデルを作る</h2>
-        <button id="make-btn" class="primary" disabled>3D モデルを作る</button>
+        <h2 id="h-make"><span class="step">3</span><span data-i18n="step3.title">3D モデルを作る</span></h2>
+        <button id="make-btn" class="primary" data-i18n="make.button" disabled>3D モデルを作る</button>
         <div id="progress" class="progress" hidden>
           <div class="bar"><div id="progress-fill"></div></div>
           <p id="progress-text"></p>
@@ -138,14 +141,14 @@
       </section>
 
       <section id="result" class="card" aria-labelledby="h-result" hidden>
-        <h2 id="h-result"><span class="step">4</span>できあがり</h2>
-        <div id="preview" class="preview" aria-label="3D プレビュー（ドラッグで回転・ホイールで拡大）"></div>
-        <div class="row view-buttons" role="group" aria-label="見る向き">
-          <button type="button" data-view="angle">斜めから</button>
-          <button type="button" data-view="top">真上から</button>
-          <button type="button" data-view="front">正面（南）から</button>
+        <h2 id="h-result"><span class="step">4</span><span data-i18n="step4.title">できあがり</span></h2>
+        <div id="preview" class="preview" data-i18n-attr="aria-label:preview.aria" aria-label="3D プレビュー（ドラッグで回転・ホイールで拡大）"></div>
+        <div class="row view-buttons" role="group" data-i18n-attr="aria-label:view.group" aria-label="見る向き">
+          <button type="button" data-view="angle" data-i18n="view.angle">斜めから</button>
+          <button type="button" data-view="top" data-i18n="view.top">真上から</button>
+          <button type="button" data-view="front" data-i18n="view.front">正面（南）から</button>
         </div>
-        <p class="hint">ドラッグで回転、右ドラッグ（2本指）で移動、ホイール（ピンチ）で拡大・縮小できます。保存する前に、選んだ縮尺・台座・高さの強調がどう出るかをここで確かめられます。</p>
+        <p class="hint" data-i18n="preview.hint">ドラッグで回転、右ドラッグ（2本指）で移動、ホイール（ピンチ）で拡大・縮小できます。保存する前に、選んだ縮尺・台座・高さの強調がどう出るかをここで確かめられます。</p>
         <div id="situation-evidence" class="situation-evidence" hidden>
           <h3 id="situation-evidence-title"></h3>
           <p id="situation-evidence-note" class="hint"></p>
@@ -153,30 +156,23 @@
         </div>
         <dl id="stats" class="stats"></dl>
         <div class="row">
-          <a id="dl-glb" class="button primary" download>GLB を保存</a>
-          <a id="dl-obj" class="button" download>OBJ を保存</a>
-          <a id="dl-stl" class="button" download>STL を保存</a>
-          <a id="dl-all" class="button" download>すべてまとめて保存</a>
-          <a id="dl-credit" class="button" download>クレジット（出典）を保存</a>
+          <a id="dl-glb" class="button primary" data-i18n="dl.glb" download>GLB を保存</a>
+          <a id="dl-obj" class="button" data-i18n="dl.obj" download>OBJ を保存</a>
+          <a id="dl-stl" class="button" data-i18n="dl.stl" download>STL を保存</a>
+          <a id="dl-all" class="button" data-i18n="dl.all" download>すべてまとめて保存</a>
+          <a id="dl-credit" class="button" data-i18n="dl.credit" download>クレジット（出典）を保存</a>
         </div>
-        <p class="hint">
-          GLB：色付き・1ファイル（PlotBlock・Web 向け）。OBJ：色付き（Blender などの編集ソフト向け）。STL：色なし（3D プリンタ向け）。
-          OBJ・STL・まとめて保存は、出典の文章ファイルと一緒に zip で保存します。
-          3D プリンタで印刷するときは、手順 2 の「使いみち」で「3D プリンタ用」を選んでから作ってください。
-        </p>
+        <p class="hint" data-i18n="formats.hint">GLB：色付き・1ファイル（PlotBlock・Web 向け）。OBJ：色付き（Blender などの編集ソフト向け）。STL：色なし（3D プリンタ向け）。OBJ・STL・まとめて保存は、出典の文章ファイルと一緒に zip で保存します。3D プリンタで印刷するときは、手順 2 の「使いみち」で「3D プリンタ用」を選んでから作ってください。</p>
         <details>
-          <summary>クレジットの文章（作ったものを使うときは、この出典を表示してください）</summary>
+          <summary data-i18n="credit.summary">クレジットの文章（作ったものを使うときは、この出典を表示してください）</summary>
           <pre id="credit"></pre>
         </details>
       </section>
     </main>
 
     <footer>
-      <p>
-        建物・道路のデータは国土交通省 Project PLATEAU の3D都市モデル（各自治体が著作権を保有）を加工したものです。
-        このツールは国土交通省・自治体のものではありません。住所の検索には国土地理院の住所検索を使っています。
-      </p>
-      <p><button id="clear-cache" class="link">手元に保存した PLATEAU データを消す</button></p>
+      <p data-i18n="footer.data">建物・道路のデータは国土交通省 Project PLATEAU の3D都市モデル（各自治体が著作権を保有）を加工したものです。このツールは国土交通省・自治体のものではありません。住所の検索には国土地理院の住所検索を使っています。</p>
+      <p><button id="clear-cache" class="link" data-i18n="footer.clearCache">手元に保存した PLATEAU データを消す</button></p>
     </footer>
     <script type="module" src="/src/web/main.ts"></script>
   </body>

@@ -91,102 +91,78 @@ export function areaCharacter(buildings: CharacterInput[], areaM2: number): Area
 /** 根拠の数値の種類 */
 export type Metric = 'density' | 'avgHeight' | 'tall31' | 'tall60' | 'old' | 'new' | 'wooden' | 'residential';
 
+/** 割合の母数の種類（「高さが分かる N 棟のうち」など） */
+export type Basis = 'all' | 'height' | 'year' | 'structure' | 'usage';
+
+/** 根拠の数値（文にするのは画面の側。言語ごとに書き方が違うため） */
 export interface Evidence {
   metric: Metric;
-  label: string;
-  /** 数値（データがないときは「データなし」の説明） */
-  value: string;
-  /** その数値が出せたか */
+  basis: Basis;
+  /** その数値が出せたか（属性がデータにないときは false） */
   known: boolean;
+  /** 当てはまる棟数と、母数（属性が分かる棟数） */
+  n: number;
+  of: number;
+  /** 割合（%、整数） */
+  pct: number;
+  /** 密度（棟/ha）・平均の高さ（m）のときの値 */
+  value?: number;
+  /** 密度のときの範囲の広さ（ha） */
+  areaHa?: number;
 }
 
-const pct = (n: number, d: number) => `${Math.round((n / d) * 100)}%`;
-const noData = (what: string) => `データなし（この地域のデータには${what}が入っていません）`;
+const BASIS: Record<Metric, Basis> = {
+  density: 'all',
+  avgHeight: 'height',
+  tall31: 'height',
+  tall60: 'height',
+  old: 'year',
+  new: 'year',
+  wooden: 'structure',
+  residential: 'usage',
+};
 
-/** 根拠の数値を、画面に出す文にする */
 export function evidenceOf(c: AreaCharacter, metric: Metric): Evidence {
-  switch (metric) {
-    case 'density':
-      return {
-        metric,
-        label: '建物の密度',
-        value: `1 ha（100m 四方）あたり ${c.density.toFixed(1)} 棟（${c.buildings} 棟 / ${c.areaHa.toFixed(1)} ha）`,
-        known: true,
-      };
-    case 'avgHeight':
-      return c.avgHeight === undefined
-        ? { metric, label: '平均の高さ', value: noData('高さ'), known: false }
-        : { metric, label: '平均の高さ', value: `${c.avgHeight.toFixed(1)} m（高さが分かる ${c.heightKnown} 棟）`, known: true };
-    case 'tall31':
-      return c.heightKnown === 0
-        ? { metric, label: '高さ 31m 以上（10 階建てくらい以上）', value: noData('高さ'), known: false }
-        : {
-            metric,
-            label: '高さ 31m 以上（10 階建てくらい以上）',
-            value: `${pct(c.tall31, c.heightKnown)}（${c.tall31} 棟 / 高さが分かる ${c.heightKnown} 棟）`,
-            known: true,
-          };
-    case 'tall60':
-      return c.heightKnown === 0
-        ? { metric, label: '高さ 60m 以上（超高層）', value: noData('高さ'), known: false }
-        : {
-            metric,
-            label: '高さ 60m 以上（超高層）',
-            value: `${c.tall60} 棟（高さが分かる ${c.heightKnown} 棟のうち ${pct(c.tall60, c.heightKnown)}）`,
-            known: true,
-          };
-    case 'old':
-      return c.yearKnown === 0
-        ? { metric, label: '1970 年以前に建てた建物', value: noData('建てた年'), known: false }
-        : {
-            metric,
-            label: '1970 年以前に建てた建物',
-            value: `${pct(c.builtBy1970, c.yearKnown)}（${c.builtBy1970} 棟 / 建てた年が分かる ${c.yearKnown} 棟）`,
-            known: true,
-          };
-    case 'new':
-      return c.yearKnown === 0
-        ? { metric, label: '2000 年以降に建てた建物', value: noData('建てた年'), known: false }
-        : {
-            metric,
-            label: '2000 年以降に建てた建物',
-            value: `${pct(c.builtFrom2000, c.yearKnown)}（${c.builtFrom2000} 棟 / 建てた年が分かる ${c.yearKnown} 棟）`,
-            known: true,
-          };
-    case 'wooden':
-      return c.structureKnown === 0
-        ? { metric, label: '木造の建物', value: noData('構造'), known: false }
-        : {
-            metric,
-            label: '木造の建物',
-            value: `${pct(c.wooden, c.structureKnown)}（${c.wooden} 棟 / 構造が分かる ${c.structureKnown} 棟）`,
-            known: true,
-          };
-    case 'residential':
-      return c.usageKnown === 0
-        ? { metric, label: '住宅（店舗などとの併用を含む）', value: noData('用途'), known: false }
-        : {
-            metric,
-            label: '住宅（店舗などとの併用を含む）',
-            value: `${pct(c.residential, c.usageKnown)}（${c.residential} 棟 / 用途が分かる ${c.usageKnown} 棟）`,
-            known: true,
-          };
+  const basis = BASIS[metric];
+  const of = { all: c.buildings, height: c.heightKnown, year: c.yearKnown, structure: c.structureKnown, usage: c.usageKnown }[basis];
+  const n = {
+    density: c.buildings,
+    avgHeight: c.heightKnown,
+    tall31: c.tall31,
+    tall60: c.tall60,
+    old: c.builtBy1970,
+    new: c.builtFrom2000,
+    wooden: c.wooden,
+    residential: c.residential,
+  }[metric];
+  const e: Evidence = { metric, basis, known: basis === 'all' || of > 0, n, of, pct: of > 0 ? Math.round((n / of) * 100) : 0 };
+  if (metric === 'density') {
+    e.value = c.density;
+    e.areaHa = c.areaHa;
   }
+  if (metric === 'avgHeight' && c.avgHeight !== undefined) e.value = c.avgHeight;
+  return e;
+}
+
+/** 日本語と英語の文 */
+export interface Text {
+  ja: string;
+  en: string;
 }
 
 export interface SituationPlace extends LatLon {
-  name: string;
+  name: Text;
   /** 選んだ理由（短く） */
-  note: string;
+  note: Text;
 }
 
 export interface Situation {
   id: string;
   /** 'station'：駅前の雰囲気、'genre'：作品のジャンル */
   kind: 'station' | 'genre';
-  label: string;
+  label: Text;
   /** どの属性で近似するか（画面に出す） */
-  approximation: string;
+  approximation: Text;
   /** 根拠として出す数値（大事な順） */
   metrics: Metric[];
   places: SituationPlace[];
@@ -199,74 +175,79 @@ export const SITUATIONS: Situation[] = [
   {
     id: 'city-station',
     kind: 'station',
-    label: '都会の駅前',
-    approximation: '高い建物が多く、平均の高さが高い所（大きなビルは1棟が大きいので、1 ha あたりの棟数はむしろ少なく出ることがある）',
+    label: { ja: '都会の駅前', en: 'Big-city station' },
+    approximation: {
+      ja: '高い建物が多く、平均の高さが高い所（大きなビルは1棟が大きいので、1 ha あたりの棟数はむしろ少なく出ることがある）',
+      en: 'many tall buildings and a high average height (big buildings are large, so the number of buildings per ha can come out low)',
+    },
     metrics: ['avgHeight', 'tall31', 'tall60', 'density'],
     places: [
-      { name: '丸の内（東京駅の西側）', lat: 35.6815, lon: 139.7655, note: '東京駅と高層のオフィスビル' },
-      { name: '新宿駅', lat: 35.6882, lon: 139.6988, note: '商業ビルが密集する' },
-      { name: '渋谷駅', lat: 35.6583, lon: 139.6996, note: '再開発の高層ビルと繁華街' },
+      { name: { ja: '丸の内（東京駅の西側）', en: 'Marunouchi (west of Tokyo Station)' }, lat: 35.6815, lon: 139.7655, note: { ja: '東京駅と高層のオフィスビル', en: 'Tokyo Station and office towers' } },
+      { name: { ja: '新宿駅', en: 'Shinjuku Station' }, lat: 35.6882, lon: 139.6988, note: { ja: '商業ビルが密集する', en: 'dense commercial buildings' } },
+      { name: { ja: '渋谷駅', en: 'Shibuya Station' }, lat: 35.6583, lon: 139.6996, note: { ja: '再開発の高層ビルと繁華街', en: 'redeveloped towers and busy streets' } },
     ],
   },
   {
     id: 'regional-station',
     kind: 'station',
-    label: '地方都市の駅前',
-    approximation: '中くらいの高さの建物が多く、住宅も混ざる所',
+    label: { ja: '地方都市の駅前', en: 'Regional-city station' },
+    approximation: { ja: '中くらいの高さの建物が多く、住宅も混ざる所', en: 'mostly mid-rise buildings mixed with houses' },
     metrics: ['avgHeight', 'tall31', 'density', 'residential'],
     places: [
-      { name: '沼津駅（静岡県沼津市）', lat: 35.1029, lon: 138.8606, note: '商店街と中層のビル' },
-      { name: '金沢駅（石川県金沢市）', lat: 36.5781, lon: 136.6476, note: '駅前のホテル・オフィス街' },
-      { name: '宇都宮駅（栃木県宇都宮市）', lat: 36.5598, lon: 139.8957, note: '県庁所在地の駅前' },
+      { name: { ja: '沼津駅（静岡県沼津市）', en: 'Numazu Station (Shizuoka)' }, lat: 35.1029, lon: 138.8606, note: { ja: '商店街と中層のビル', en: 'shopping streets and mid-rise buildings' } },
+      { name: { ja: '金沢駅（石川県金沢市）', en: 'Kanazawa Station (Ishikawa)' }, lat: 36.5781, lon: 136.6476, note: { ja: '駅前のホテル・オフィス街', en: 'hotels and offices by the station' } },
+      { name: { ja: '宇都宮駅（栃木県宇都宮市）', en: 'Utsunomiya Station (Tochigi)' }, lat: 36.5598, lon: 139.8957, note: { ja: '県庁所在地の駅前', en: 'prefectural capital station area' } },
     ],
   },
   {
     id: 'rural-station',
     kind: 'station',
-    label: '田舎の駅前',
-    approximation:
-      '低い建物と住宅が中心の所（地方都市の駅前は大きな建物が多いので、1 ha あたりの棟数は田舎の駅前のほうが多く出ることがある）',
+    label: { ja: '田舎の駅前', en: 'Countryside station' },
+    approximation: {
+      ja: '低い建物と住宅が中心の所（地方都市の駅前は大きな建物が多いので、1 ha あたりの棟数は田舎の駅前のほうが多く出ることがある）',
+      en: 'mostly low buildings and houses (regional-city stations have many large buildings, so the number of buildings per ha can come out higher at a countryside station)',
+    },
     metrics: ['avgHeight', 'residential', 'wooden', 'density'],
     places: [
-      { name: '大聖寺駅（石川県加賀市）', lat: 36.3003, lon: 136.3143, note: '小さな町の駅前' },
-      { name: '茅野駅（長野県茅野市）', lat: 35.995, lon: 138.1522, note: '高原の町の駅前' },
-      { name: '伊豆急下田駅（静岡県下田市）', lat: 34.68, lon: 138.9404, note: '海辺の小さな町' },
+      { name: { ja: '大聖寺駅（石川県加賀市）', en: 'Daishoji Station (Kaga, Ishikawa)' }, lat: 36.3003, lon: 136.3143, note: { ja: '小さな町の駅前', en: 'small-town station' } },
+      { name: { ja: '茅野駅（長野県茅野市）', en: 'Chino Station (Nagano)' }, lat: 35.995, lon: 138.1522, note: { ja: '高原の町の駅前', en: 'highland town station' } },
+      { name: { ja: '伊豆急下田駅（静岡県下田市）', en: 'Izukyu-Shimoda Station (Shizuoka)' }, lat: 34.68, lon: 138.9404, note: { ja: '海辺の小さな町', en: 'small seaside town' } },
     ],
   },
   {
     id: 'horror',
     kind: 'genre',
-    label: '古い木造の町並み（ホラー・時代もの向き）',
-    approximation: '古い建物と木造の建物が多い所',
+    label: { ja: '古い木造の町並み（ホラー・時代もの向き）', en: 'Old wooden townscape (for horror and period pieces)' },
+    approximation: { ja: '古い建物と木造の建物が多い所', en: 'many old and wooden buildings' },
     metrics: ['old', 'wooden', 'avgHeight'],
     places: [
-      { name: 'ひがし茶屋街（金沢市東山）', lat: 36.5714, lon: 136.6669, note: '古い木造の町並みが残る' },
-      { name: 'ペリーロード付近（下田市三丁目）', lat: 34.6679, lon: 138.9451, note: '古い家が残る港町' },
-      { name: '旧城下町（加賀市大聖寺）', lat: 36.3047, lon: 136.3125, note: '古い家と寺が多い' },
+      { name: { ja: 'ひがし茶屋街（金沢市東山）', en: 'Higashi Chaya district (Kanazawa)' }, lat: 36.5714, lon: 136.6669, note: { ja: '古い木造の町並みが残る', en: 'an old wooden townscape remains' } },
+      { name: { ja: 'ペリーロード付近（下田市三丁目）', en: 'Near Perry Road (Shimoda)' }, lat: 34.6679, lon: 138.9451, note: { ja: '古い家が残る港町', en: 'port town with old houses' } },
+      { name: { ja: '旧城下町（加賀市大聖寺）', en: 'Old castle town (Daishoji, Kaga)' }, lat: 36.3047, lon: 136.3125, note: { ja: '古い家と寺が多い', en: 'many old houses and temples' } },
     ],
   },
   {
     id: 'calm-residential',
     kind: 'genre',
-    label: 'ほのぼの（静かな住宅街）',
-    approximation: '住宅が多く、低い建物が中心の所',
+    label: { ja: 'ほのぼの（静かな住宅街）', en: 'Slice of life (quiet residential area)' },
+    approximation: { ja: '住宅が多く、低い建物が中心の所', en: 'mostly houses and low buildings' },
     metrics: ['residential', 'avgHeight', 'tall31', 'density'],
     places: [
-      { name: '成城学園前駅（東京都世田谷区）', lat: 35.64, lon: 139.5989, note: '低い戸建てが並ぶ住宅街' },
-      { name: '石神井公園駅（東京都練馬区）', lat: 35.7437, lon: 139.606, note: '公園のそばの住宅街' },
-      { name: '荻窪駅（東京都杉並区）', lat: 35.7044, lon: 139.6202, note: '駅の周りに住宅が広がる' },
+      { name: { ja: '成城学園前駅（東京都世田谷区）', en: 'Seijogakuen-mae Station (Setagaya, Tokyo)' }, lat: 35.64, lon: 139.5989, note: { ja: '低い戸建てが並ぶ住宅街', en: 'streets of low detached houses' } },
+      { name: { ja: '石神井公園駅（東京都練馬区）', en: 'Shakujii-koen Station (Nerima, Tokyo)' }, lat: 35.7437, lon: 139.606, note: { ja: '公園のそばの住宅街', en: 'residential area near a park' } },
+      { name: { ja: '荻窪駅（東京都杉並区）', en: 'Ogikubo Station (Suginami, Tokyo)' }, lat: 35.7044, lon: 139.6202, note: { ja: '駅の周りに住宅が広がる', en: 'houses spread around the station' } },
     ],
   },
   {
     id: 'futuristic',
     kind: 'genre',
-    label: '近未来（高層ビル街）',
-    approximation: '超高層ビルと、新しい建物の多さで近似',
+    label: { ja: '近未来（高層ビル街）', en: 'Near future (high-rise district)' },
+    approximation: { ja: '超高層ビルと、新しい建物の多さで近似', en: 'approximated by high-rises and the share of new buildings' },
     metrics: ['tall60', 'avgHeight', 'new', 'tall31'],
     places: [
-      { name: '都庁前駅（西新宿の高層ビル街）', lat: 35.6904, lon: 139.6924, note: '超高層ビルが集まる' },
-      { name: '汐留駅（東京都港区）', lat: 35.663, lon: 139.7603, note: '再開発の高層ビル群' },
-      { name: 'みなとみらい駅（横浜市）', lat: 35.4582, lon: 139.6319, note: '海沿いの新しい高層ビル街' },
+      { name: { ja: '都庁前駅（西新宿の高層ビル街）', en: 'Tochomae Station (Nishi-Shinjuku towers)' }, lat: 35.6904, lon: 139.6924, note: { ja: '超高層ビルが集まる', en: 'cluster of skyscrapers' } },
+      { name: { ja: '汐留駅（東京都港区）', en: 'Shiodome Station (Minato, Tokyo)' }, lat: 35.663, lon: 139.7603, note: { ja: '再開発の高層ビル群', en: 'redeveloped high-rise cluster' } },
+      { name: { ja: 'みなとみらい駅（横浜市）', en: 'Minatomirai Station (Yokohama)' }, lat: 35.4582, lon: 139.6319, note: { ja: '海沿いの新しい高層ビル街', en: 'new waterfront high-rise district' } },
     ],
   },
 ];

@@ -8,7 +8,7 @@ import { makeZip, stlHeader, toMtl, toObj, toStl } from './export.js';
 import { buildGlb, GROUPS } from './glb.js';
 import { areaM2, localRingOf, MAX_SIZE, meshCodesForPolygon, MIN_SIZE, polygonIssue } from './area.js';
 import { finishForPrint, ROAD_PRINT_MM, scalePieces, validatePrint, type PrintInfo, type PrintOptions } from './print.js';
-import { areaCharacter, type AreaCharacter } from './situation.js';
+import { areaCharacter, type AreaCharacter, type Text } from './situation.js';
 import { SceneBuilder, type BuildingInfo, type MeshPart, type ModelPiece } from './scene.js';
 
 export { areaOfPolygon, MAX_SIZE, MIN_SIZE } from './area.js';
@@ -151,16 +151,23 @@ export interface GenerateResult {
   fileName: string;
 }
 
-/** 建物の細かさの名前（記録・出典の説明用） */
-export function detailLabel(req: AreaRequest): string {
+/** 建物の細かさの名前（記録・出典の説明用。日本語と英語） */
+export function detailLabel(req: AreaRequest): Text {
   if (req.print) {
-    return req.lod === 1 ? '箱型（LOD1）' : `屋根の形あり（LOD${req.lod === 3 ? '3 の屋根' : '2'}）`;
+    return req.lod === 1
+      ? { ja: '箱型（LOD1）', en: 'boxes (LOD1)' }
+      : { ja: `屋根の形あり（LOD${req.lod === 3 ? '3 の屋根' : '2'}）`, en: `roof shapes (${req.lod === 3 ? 'LOD3 roofs' : 'LOD2'})` };
   }
-  if (req.lod === 1) return '箱型（LOD1）';
+  if (req.lod === 1) return { ja: '箱型（LOD1）', en: 'boxes (LOD1)' };
   if (req.lod === 3) {
-    return `窓・扉まである形（LOD3。LOD3 のない建物は屋根の形〔LOD2〕で代用${req.installations ? '、付属物あり' : ''}）`;
+    return {
+      ja: `窓・扉まである形（LOD3。LOD3 のない建物は屋根の形〔LOD2〕で代用${req.installations ? '、付属物あり' : ''}）`,
+      en: `shapes with windows and doors (LOD3; buildings without LOD3 use roof shapes [LOD2]${req.installations ? '; with attachments' : ''})`,
+    };
   }
-  return req.installations ? '屋根の形とベランダなどの付属物あり（LOD2）' : '屋根の形あり（LOD2）';
+  return req.installations
+    ? { ja: '屋根の形とベランダなどの付属物あり（LOD2）', en: 'roof shapes with balconies and other attachments (LOD2)' }
+    : { ja: '屋根の形あり（LOD2）', en: 'roof shapes (LOD2)' };
 }
 
 /** ファイル名に付ける細かさの印 */
@@ -244,24 +251,53 @@ export async function generateFromPlan(
   const createdAt = today();
   const place = req.placeName?.trim() || `${req.center.lat.toFixed(5)},${req.center.lon.toFixed(5)}`;
   const detail = detailLabel(req);
-  const range = req.polygon
-    ? `地図の上で囲んだ範囲（${req.polygon.length} 点の多角形。ちょうど入る正方形の一辺 ${req.size} m）を切り出し`
-    : `を中心に一辺 ${req.size} m の範囲を切り出し`;
-  const description = `「${place}」${req.polygon ? 'の' : ''}${range}（中心 緯度 ${req.center.lat.toFixed(6)}・経度 ${req.center.lon.toFixed(6)}）、${detail}の建物にする`;
-  const processing = print
+  const lat = req.center.lat.toFixed(6);
+  const lon = req.center.lon.toFixed(6);
+  const n = req.polygon?.length ?? 0;
+  const description: Text = req.polygon
+    ? {
+        ja: `「${place}」の地図の上で囲んだ範囲（${n} 点の多角形。ちょうど入る正方形の一辺 ${req.size} m）を切り出し（中心 緯度 ${lat}・経度 ${lon}）、${detail.ja}の建物にする`,
+        en: `Cut out an area drawn on the map near "${place}" (a polygon of ${n} points that fits in a ${req.size} m square; center latitude ${lat}, longitude ${lon}) and made the buildings as ${detail.en}`,
+      }
+    : {
+        ja: `「${place}」を中心に一辺 ${req.size} m の範囲を切り出し（中心 緯度 ${lat}・経度 ${lon}）、${detail.ja}の建物にする`,
+        en: `Cut out a ${req.size} m square centered on "${place}" (center latitude ${lat}, longitude ${lon}) and made the buildings as ${detail.en}`,
+      };
+  const scaleEn = print?.scaleLabel.replace(/^約/, 'about ');
+  const processing: Text[] = print
     ? [
-        `3Dプリンタ用に、縮尺 ${print.scaleLabel}（印刷したときの大きさ 幅 ${print.widthMm} × 奥行き ${print.depthMm} × 高さ ${print.heightMm} mm）にする`,
-        '建物は屋根の面を真下へ押し出した閉じた形に作り直す（壁の細かな形・付属物・窓・扉は省く）',
-        `道路は厚さ ${ROAD_PRINT_MM} mm の板にする`,
-        ...(print.baseMm > 0 ? [`厚さ ${print.baseMm} mm の台座を加え、建物・道路の下端を台座に食い込ませる`] : []),
-        ...(print.droppedFaces > 0 ? [`元データの形がくずれていて閉じた形にできない面 ${print.droppedFaces} 枚を省く`] : []),
+        {
+          ja: `3Dプリンタ用に、縮尺 ${print.scaleLabel}（印刷したときの大きさ 幅 ${print.widthMm} × 奥行き ${print.depthMm} × 高さ ${print.heightMm} mm）にする`,
+          en: `Scaled to ${scaleEn} for 3D printing (printed size ${print.widthMm} × ${print.depthMm} × ${print.heightMm} mm)`,
+        },
+        {
+          ja: '建物は屋根の面を真下へ押し出した閉じた形に作り直す（壁の細かな形・付属物・窓・扉は省く）',
+          en: 'Rebuilt buildings as closed solids by extruding roofs straight down (wall details, attachments, windows and doors left out)',
+        },
+        { ja: `道路は厚さ ${ROAD_PRINT_MM} mm の板にする`, en: `Made roads into ${ROAD_PRINT_MM} mm thick plates` },
+        ...(print.baseMm > 0
+          ? [{ ja: `厚さ ${print.baseMm} mm の台座を加え、建物・道路の下端を台座に食い込ませる`, en: `Added a ${print.baseMm} mm base and sank the bottoms of buildings and roads into it` }]
+          : []),
+        ...(print.droppedFaces > 0
+          ? [{ ja: `元データの形がくずれていて閉じた形にできない面 ${print.droppedFaces} 枚を省く`, en: `Left out ${print.droppedFaces} faces whose source shapes were broken` }]
+          : []),
         ...(print.removedBuildings + print.removedRoads > 0
-          ? [`印刷すると ${print.minFeatureMm} mm より細い建物 ${print.removedBuildings} 棟・道路 ${print.removedRoads} か所を省く`]
+          ? [
+              {
+                ja: `印刷すると ${print.minFeatureMm} mm より細い建物 ${print.removedBuildings} 棟・道路 ${print.removedRoads} か所を省く`,
+                en: `Removed ${print.removedBuildings} buildings and ${print.removedRoads} road pieces thinner than ${print.minFeatureMm} mm when printed`,
+              },
+            ]
           : []),
       ]
     : [];
   const heightScale = req.heightScale ?? 1;
-  if (heightScale !== 1) processing.unshift(`建物の高さだけを ${heightScale} 倍に強調する（幅・奥行きは元のまま）`);
+  if (heightScale !== 1) {
+    processing.unshift({
+      ja: `建物の高さだけを ${heightScale} 倍に強調する（幅・奥行きは元のまま）`,
+      en: `Exaggerated building heights only by ${heightScale}× (width and depth unchanged)`,
+    });
+  }
   const credit = buildCredit(used, { description, createdAt, processing });
 
   const extras = {

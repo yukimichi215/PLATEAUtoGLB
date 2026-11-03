@@ -4,8 +4,11 @@ import { searchPlace, type Place } from '../core/geocode.js';
 import type { AreaPlan, AreaRequest, DownloadKind, GenerateStats } from '../core/pipeline.js';
 import type { PrintOptions } from '../core/print.js';
 import { AreaMap, type AreaMode, type DrawState } from './area-map.js';
-import { situationEvidence, SITUATIONS, type Situation } from '../core/situation.js';
+import { situationEvidence, SITUATIONS, type Situation, type Text } from '../core/situation.js';
 import { Preview, type ViewName } from './preview.js';
+import { evidenceText } from './evidence-text.js';
+import { applyStatic, lang, onLangChange, setLang, t, type Lang } from './i18n/index.js';
+import { translateCore } from './i18n/core-messages.js';
 import { DONATE_CONFIG } from './donate-config.js';
 import { donateLinks, renderDonate } from './donate.js';
 import type { WorkerRequest, WorkerResponse } from './worker.js';
@@ -59,6 +62,7 @@ const evidenceEl = $<HTMLDivElement>('situation-evidence');
 const evidenceTitle = $<HTMLHeadingElement>('situation-evidence-title');
 const evidenceNote = $<HTMLParagraphElement>('situation-evidence-note');
 const evidenceList = $<HTMLDListElement>('situation-evidence-list');
+const langSelect = $<HTMLSelectElement>('lang-select');
 
 /** 取得量がこれを超えるときは、作る前に確認する（MB） */
 const CONFIRM_MB = 300;
@@ -66,6 +70,10 @@ const CONFIRM_MB = 300;
 let selected: Place | null = null;
 /** シチュエーションの候補から選んだときの、そのシチュエーション（住所の検索で選んだときはなし） */
 let selectedSituation: Situation | null = null;
+/** シチュエーションの候補の名前（言語ごと） */
+let selectedName: Text | null = null;
+/** できあがりの表示に使ったもの（言語を変えたときに出し直す） */
+let lastResult: { stats: GenerateStats; request: AreaRequest; situation: Situation | null } | null = null;
 let busy = false;
 let preview: Preview | null = null;
 /** 範囲を選ぶ地図（場所を選んだときに作る。それまでは地図のタイルを読み込まない） */
@@ -92,8 +100,11 @@ function call(msg: WorkerRequest, onProgress?: (r: number, m: string) => void): 
   });
 }
 
+/** 中身の処理（日本語）の文を、画面の言語にする */
+const coreText = (text: string) => (lang() === 'en' ? translateCore(text) : text);
+
 function showMessage(text: string, isError = false): void {
-  messageEl.textContent = text;
+  messageEl.textContent = coreText(text);
   messageEl.classList.toggle('error', isError);
 }
 
@@ -114,19 +125,27 @@ function mb(bytes: number): string {
   return bytes >= 1e6 ? `${(bytes / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1e3))} KB`;
 }
 
-function selectPlace(p: Place, situation: Situation | null = null): void {
+function selectPlace(p: Place, situation: Situation | null = null, name: Text | null = null): void {
   selected = p;
   selectedSituation = situation;
+  selectedName = name;
   candidatesEl.hidden = true;
   placeEl.hidden = false;
-  placeEl.textContent = `選んだ場所：${p.title}（緯度 ${p.lat.toFixed(5)}・経度 ${p.lon.toFixed(5)}）`;
+  renderPlace();
   mapWrap.hidden = false;
   mapNeedPlace.hidden = true;
-  areaMap ??= new AreaMap($('map'), onDrawChange);
+  areaMap ??= new AreaMap($('map'), onDrawChange, t('map.attribution'));
   areaMap.setMode(currentAreaMode());
   areaMap.show({ lat: p.lat, lon: p.lon }, Number(sizeEl.value));
   setBusy(busy);
   showMessage('');
+}
+
+/** 選んだ場所の表示（シチュエーションの候補なら、その言語の名前） */
+function renderPlace(): void {
+  if (!selected) return;
+  const title = selectedName ? selectedName[lang()] : coreText(selected.title);
+  placeEl.textContent = t('place.selected', { title, lat: selected.lat.toFixed(5), lon: selected.lon.toFixed(5) });
 }
 
 const currentAreaMode = () =>
@@ -142,27 +161,26 @@ function onDrawChange(s: DrawState): void {
   mapFinish.hidden = s.mode !== 'polygon';
   mapUndo.disabled = s.drawingPoints === 0;
   mapFinish.disabled = s.drawingPoints < 3;
-  mapHint.classList.toggle('error', s.issue !== undefined);
-  mapHint.textContent = drawHint(s);
+  renderMapHint();
   setBusy(busy);
   updatePrintUi();
 }
 
+function renderMapHint(): void {
+  mapHint.classList.toggle('error', draw.issue !== undefined);
+  mapHint.textContent = drawHint(draw);
+}
+
 function drawHint(s: DrawState): string {
-  if (s.issue === 'tooSmall') return '囲んだ形の面積がほぼありません。「描き直す」で、点が一直線に並ばないように囲み直してください。';
-  if (s.issue === 'crossing') return '線が交差しているか、1点で触れています。「描き直す」で、線が交差・接しないように囲み直してください。';
-  if (s.issue === 'tooLarge') return `囲んだ範囲が大きすぎます（一辺 ${MAX_SIZE} m の正方形に入る大きさまで。今は約 ${s.size} m）。`;
-  if (s.polygon) {
-    return `囲んだ範囲：一辺 約 ${s.size} m の正方形に入る大きさ（${s.polygon.length} 点）。描き直すときは「描き直す」を押します。` +
-      '囲んだ線にかかる大きな建物も、中心が中にあれば丸ごと入るので、線より少し大きく出ることがあります。';
-  }
-  if (s.mode === 'rect') return '地図の上で、押したまま動かして四角を描きます（このあいだ地図はドラッグで動かせません。拡大・縮小はホイール・2本指・＋−で）。';
+  if (s.issue === 'tooSmall') return t('map.hint.tooSmall');
+  if (s.issue === 'crossing') return t('map.hint.crossing');
+  if (s.issue === 'tooLarge') return t('map.hint.tooLarge', { max: MAX_SIZE, size: s.size ?? 0 });
+  if (s.polygon) return t('map.hint.done', { size: s.size ?? 0, n: s.polygon.length });
+  if (s.mode === 'rect') return t('map.hint.rect');
   if (s.mode === 'polygon') {
-    return s.drawingPoints === 0
-      ? '地図を押して、囲む形の角に点を打ちます。最初の点をもう一度押すか「囲み終える」で閉じます。'
-      : `点 ${s.drawingPoints} 個。続けて点を打つか、最初の点を押す・「囲み終える」で閉じます（3点以上）。`;
+    return s.drawingPoints === 0 ? t('map.hint.polygonStart') : t('map.hint.polygonMore', { n: s.drawingPoints });
   }
-  return '地図の青い四角が切り出す範囲です。広さは下で選べます。';
+  return t('map.hint.square');
 }
 
 for (const el of document.querySelectorAll<HTMLInputElement>('input[name="area"]')) {
@@ -178,28 +196,28 @@ sizeEl.addEventListener('change', () => areaMap?.setSize(Number(sizeEl.value)));
 
 async function fetchJson(url: string): Promise<unknown> {
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`検索に失敗しました（${res.status}）`);
+  if (!res.ok) throw new Error(t('search.failedStatus', { status: res.status }));
   return res.json();
 }
 
 searchForm.addEventListener('submit', async (ev) => {
   ev.preventDefault();
   setBusy(true);
-  showMessage('検索中…');
+  showMessage(t('search.searching'));
   candidatesEl.replaceChildren();
   try {
     const places = await searchPlace(searchInput.value, fetchJson);
     if (places.length === 0) {
-      showMessage('見つかりませんでした。書き方を変えてみてください（例：「東京都千代田区丸の内1丁目」）。', true);
+      showMessage(t('search.notFound'), true);
     } else if (places.length === 1) {
       selectPlace(places[0]!);
     } else {
-      showMessage('候補から選んでください。');
+      showMessage(t('search.choose'));
       for (const p of places) {
         const li = document.createElement('li');
         const b = document.createElement('button');
         b.type = 'button';
-        b.textContent = p.title;
+        b.textContent = coreText(p.title);
         b.addEventListener('click', () => selectPlace(p));
         li.appendChild(b);
         candidatesEl.appendChild(li);
@@ -207,68 +225,65 @@ searchForm.addEventListener('submit', async (ev) => {
       candidatesEl.hidden = false;
     }
   } catch (e) {
-    showMessage(
-      `住所の検索ができませんでした：${e instanceof Error ? e.message : e}\n「35.6812, 139.7671」のように緯度・経度で入れることもできます。`,
-      true,
-    );
+    showMessage(t('search.failed', { error: e instanceof Error ? e.message : String(e) }), true);
   } finally {
     setBusy(false);
   }
 });
 
 // シチュエーションから探す：条件を選ぶと、向いた地域の候補（手で選んだ見本）を出す
-const SITUATION_GROUPS = [
-  { kind: 'station', label: '駅前の雰囲気' },
-  { kind: 'genre', label: '作品のジャンル' },
-] as const;
-{
+function renderSituationSelect(): void {
+  const value = situationSelect.value;
+  situationSelect.replaceChildren();
   const none = document.createElement('option');
   none.value = '';
-  none.textContent = '選んでください';
+  none.textContent = t('situation.choose');
   situationSelect.append(none);
-  for (const g of SITUATION_GROUPS) {
+  for (const kind of ['station', 'genre'] as const) {
     const group = document.createElement('optgroup');
-    group.label = g.label;
-    for (const s of SITUATIONS.filter((x) => x.kind === g.kind)) {
+    group.label = t(kind === 'station' ? 'situation.group.station' : 'situation.group.genre');
+    for (const s of SITUATIONS.filter((x) => x.kind === kind)) {
       const o = document.createElement('option');
       o.value = s.id;
-      o.textContent = s.label;
+      o.textContent = s.label[lang()];
       group.append(o);
     }
     situationSelect.append(group);
   }
+  situationSelect.value = value;
+  renderSituationPlaces();
 }
-situationSelect.addEventListener('change', () => {
+
+function renderSituationPlaces(): void {
   const s = SITUATIONS.find((x) => x.id === situationSelect.value);
   situationPlaces.replaceChildren();
-  situationNote.textContent = s
-    ? `目安：${s.approximation}。下の候補は、特定の町の評価ではなく、データ上の特徴（古さ・構造など）が近い例です。` +
-      '候補を選んで作ると、できあがりに根拠の数値（建物の属性から出した近似）を出します。'
-    : '';
+  situationNote.textContent = s ? t('situation.note', { approximation: s.approximation[lang()] }) : '';
   if (!s) return;
   for (const p of s.places) {
     const li = document.createElement('li');
     const b = document.createElement('button');
     b.type = 'button';
-    b.textContent = `${p.name}：${p.note}`;
-    b.addEventListener('click', () => selectPlace({ lat: p.lat, lon: p.lon, title: p.name }, s));
+    b.textContent = t('situation.place', { name: p.name[lang()], note: p.note[lang()] });
+    b.addEventListener('click', () => selectPlace({ lat: p.lat, lon: p.lon, title: p.name.ja }, s, p.name));
     li.appendChild(b);
     situationPlaces.appendChild(li);
   }
-});
+}
+situationSelect.addEventListener('change', renderSituationPlaces);
 
 /** できあがりに、選んだシチュエーションの根拠の数値を出す */
 function showEvidence(situation: Situation | null, character: GenerateStats['character']): void {
   evidenceEl.hidden = situation === null;
   evidenceList.replaceChildren();
   if (!situation) return;
-  evidenceTitle.textContent = `「${situation.label}」に向いているかの目安`;
-  evidenceNote.textContent = `PLATEAU の建物の属性から出した近似です（${situation.approximation}）。町の雰囲気そのものはデータにないので分かりません。`;
+  evidenceTitle.textContent = t('evidence.title', { label: situation.label[lang()] });
+  evidenceNote.textContent = t('evidence.note', { approximation: situation.approximation[lang()] });
   for (const e of situationEvidence(situation, character)) {
+    const { label, value } = evidenceText(e);
     const dt = document.createElement('dt');
-    dt.textContent = e.label;
+    dt.textContent = label;
     const dd = document.createElement('dd');
-    dd.textContent = e.value;
+    dd.textContent = value;
     evidenceList.append(dt, dd);
   }
 }
@@ -301,13 +316,9 @@ function updatePrintUi(): void {
   const size = currentSize();
   const p = currentPrint()!;
   const side = p.fitSideMm ?? (size * 1000) / p.scaleDenominator!;
-  const scale = p.fitSideMm ? `（縮尺 約 1/${Math.round((size * 1000) / p.fitSideMm)}）` : '';
-  printHintEl.textContent =
-    (draw.mode !== 'square' && draw.polygon
-      ? `印刷したときの台座の大きさ：囲んだ形（約 ${side.toFixed(0)} × ${side.toFixed(0)} mm の四角に入る大きさ）${scale}。`
-      : `印刷したときの台座の大きさ：約 ${side.toFixed(0)} × ${side.toFixed(0)} mm${scale}。`) +
-    'OBJ・STL はミリメートル、STL は印刷ソフトに合わせて上が +Z です。' +
-    '建物は屋根の面を真下に押し出した、穴のない形に作り直します（付属物・窓は入れず、範囲からはみ出した部分は切り落とします。台座が地面の代わりになります）。';
+  const scale = p.fitSideMm ? t('print.hint.scale', { d: Math.round((size * 1000) / p.fitSideMm) }) : '';
+  const sizeKey = draw.mode !== 'square' && draw.polygon ? 'print.hint.sizeArea' : 'print.hint.size';
+  printHintEl.textContent = t(sizeKey, { w: side.toFixed(0), scale }) + t('print.hint.rest');
 }
 for (const el of [...document.querySelectorAll('input[name="use"]'), scaleEl, fitMmEl, baseMmEl, sizeEl]) {
   el.addEventListener('input', updatePrintUi);
@@ -343,7 +354,7 @@ function currentRequest(): AreaRequest {
 function setProgress(ratio: number, text: string): void {
   progressEl.hidden = false;
   progressFill.style.width = `${Math.round(ratio * 100)}%`;
-  progressText.textContent = text;
+  progressText.textContent = coreText(text);
 }
 
 function addStat(label: string, value: string): void {
@@ -354,36 +365,79 @@ function addStat(label: string, value: string): void {
   statsEl.append(dt, dd);
 }
 
+/** できあがりの数値の表示（言語を変えたときも出し直す） */
+function renderResultTexts(): void {
+  if (!lastResult) return;
+  const { stats: s, request, situation } = lastResult;
+  const num = (n: number) => n.toLocaleString(lang() === 'en' ? 'en-US' : 'ja-JP');
+  statsEl.replaceChildren();
+  addStat(t('stats.buildings'), t('stats.count', { n: num(s.buildings) }));
+  if (request.polygon) addStat(t('stats.area'), t('stats.area.value', { n: request.polygon.length, size: request.size }));
+  if (request.separateBuildings && !s.print) addStat(t('stats.parts'), t('stats.parts.value', { n: num(s.buildings) }));
+  if (request.installations) {
+    addStat(
+      t('stats.installations'),
+      s.buildingsWithInstallations > 0 ? t('stats.count', { n: num(s.buildingsWithInstallations) }) : t('stats.installations.none'),
+    );
+  }
+  // 選んだ細かさのデータがなく、粗い形で代わりに作った建物
+  const fallback = ([3, 2, 1] as const).filter((l) => l < request.lod && s.lodUsed[l] > 0);
+  if (fallback.length > 0) {
+    const n = fallback.reduce((sum, l) => sum + s.lodUsed[l], 0);
+    const list = fallback.map((l) => `${t(`stats.lod.${l}`)} ${num(s.lodUsed[l])}`).join(t('stats.listSep'));
+    addStat(t('stats.fallback'), t('stats.fallback.value', { n: num(n), list }));
+  }
+  if (request.includeRoads) addStat(t('stats.roads'), t('stats.roads.value', { n: num(s.roads) }));
+  addStat(t('stats.triangles'), num(s.triangles));
+  addStat(t('stats.fileSize'), mb(s.glbBytes));
+  if (request.heightScale && request.heightScale !== 1) addStat(t('stats.heightScale'), t('stats.heightScale.value', { n: request.heightScale }));
+  if (s.print) {
+    addStat(t('stats.scale'), coreText(s.print.scaleLabel));
+    addStat(t('stats.printSize'), `${s.print.widthMm} × ${s.print.depthMm} × ${s.print.heightMm} mm`);
+    addStat(t('stats.base'), s.print.baseMm > 0 ? `${s.print.baseMm} mm` : t('stats.base.none'));
+    if (s.print.droppedFaces > 0) addStat(t('stats.dropped'), t('stats.dropped.value', { n: s.print.droppedFaces }));
+    if (s.print.minFeatureMm > 0) {
+      addStat(
+        t('stats.removed', { mm: s.print.minFeatureMm }),
+        t('stats.removed.value', { b: s.print.removedBuildings, r: s.print.removedRoads }),
+      );
+    }
+  } else {
+    addStat(t('stats.size'), `${s.width} × ${s.depth} × ${s.height} m`);
+  }
+  showEvidence(situation, s.character);
+}
+
 makeBtn.addEventListener('click', async () => {
   if (!canMake() || busy) return;
   setBusy(true);
   showMessage('');
-  setProgress(0, 'この場所の PLATEAU データを調べています…');
+  setProgress(0, t('make.checking'));
   // 作り始めたときの場所がシチュエーションの候補なら、できあがりに根拠の数値を出す
   const situationOfRequest = selectedSituation;
   try {
     const planRes = await call({ type: 'plan', req: currentRequest() });
-    if (planRes.type !== 'plan') throw new Error('予期しない応答');
+    if (planRes.type !== 'plan') throw new Error(t('make.unexpected'));
     const plan: AreaPlan = planRes.plan;
     const toDownload = plan.files.filter((f) => !planRes.cachedUrls.includes(f.url));
     const dlBytes = toDownload.reduce((s, f) => s + f.fileSize, 0);
     if (plan.files.every((f) => f.type !== 'bldg')) {
-      throw new Error('この場所には PLATEAU の建物データがありません（まだ整備されていない地域の可能性があります）。');
+      throw new Error(t('make.noData'));
     }
     const unknown = toDownload.filter((f) => !(f.fileSize > 0)).length;
     if (dlBytes > CONFIRM_MB * 1e6) {
       const ok = window.confirm(
-        `この場所のデータは約 ${mb(dlBytes)}${unknown > 0 ? `＋大きさ不明のファイル ${unknown} 件` : ''} あります（通信は圧縮されるので、実際の通信量はこの1〜2割程度です）。\n読み込みに時間がかかることがあります。続けますか？`,
+        t('make.confirmLarge', { size: mb(dlBytes), unknown: unknown > 0 ? t('make.confirmUnknown', { n: unknown }) : '' }),
       );
       if (!ok) {
         progressEl.hidden = true;
-        showMessage('中止しました。');
+        showMessage(t('make.aborted'));
         return;
       }
     }
     const res = await call({ type: 'generate', plan }, (r, m) => setProgress(r, m));
-    if (res.type !== 'done') throw new Error('予期しない応答');
-    setProgress(1, '完成しました');
+    if (res.type !== 'done') throw new Error(t('make.unexpected'));
+    setProgress(1, t('make.done'));
     // 注意があれば、できあがりと一緒に目立つように出す
     if (res.stats.warnings.length > 0) showMessage(res.stats.warnings.join('\n'), true);
 
@@ -398,56 +452,11 @@ makeBtn.addEventListener('click', async () => {
     }
     creditEl.textContent = res.credit;
 
-    const s = res.stats;
-    statsEl.replaceChildren();
-    addStat('建物', `${s.buildings.toLocaleString()} 棟`);
-    if (plan.request.polygon) {
-      addStat('範囲', `地図で囲んだ形（${plan.request.polygon.length} 点。一辺 約 ${plan.request.size} m の正方形に入る大きさ）`);
-    }
-    if (plan.request.separateBuildings && !s.print) addStat('部品の分け方', `建物を1棟ずつ（${s.buildings.toLocaleString()} 個）＋道路・地面`);
-    if (plan.request.installations) {
-      addStat(
-        'ベランダなどのある建物',
-        s.buildingsWithInstallations > 0
-          ? `${s.buildingsWithInstallations.toLocaleString()} 棟`
-          : 'なし（この地域のデータには入っていません）',
-      );
-    }
-    // 選んだ細かさのデータがなく、粗い形で代わりに作った建物
-    const wanted = plan.request.lod;
-    const fallback = ([3, 2, 1] as const).filter((l) => l < wanted && s.lodUsed[l] > 0);
-    if (fallback.length > 0) {
-      const names = { 1: '箱型', 2: '屋根の形', 3: '窓・扉まで' } as const;
-      const n = fallback.reduce((sum, l) => sum + s.lodUsed[l], 0);
-      addStat(
-        'データがなく粗い形で代わりに作った建物',
-        `${n.toLocaleString()} 棟（${fallback.map((l) => `${names[l]} ${s.lodUsed[l].toLocaleString()}`).join('・')}）`,
-      );
-    }
-    if (plan.request.includeRoads) addStat('道路', `${s.roads.toLocaleString()} 本`);
-    addStat('三角形の数', s.triangles.toLocaleString());
-    addStat('ファイルの大きさ', mb(s.glbBytes));
-    if (plan.request.heightScale && plan.request.heightScale !== 1) addStat('高さの強調', `${plan.request.heightScale} 倍`);
-    if (s.print) {
-      addStat('縮尺', s.print.scaleLabel);
-      addStat('印刷したときの大きさ（幅×奥行き×高さ）', `${s.print.widthMm} × ${s.print.depthMm} × ${s.print.heightMm} mm`);
-      addStat('台座の厚さ', s.print.baseMm > 0 ? `${s.print.baseMm} mm` : 'なし');
-      if (s.print.droppedFaces > 0) {
-        addStat('形がくずれていて入れられなかった面', `${s.print.droppedFaces} 枚（屋根の一部・道路）`);
-      }
-      if (s.print.minFeatureMm > 0) {
-        addStat(
-          `細すぎて外したもの（${s.print.minFeatureMm} mm 未満）`,
-          `建物 ${s.print.removedBuildings} 棟・道路 ${s.print.removedRoads} か所`,
-        );
-      }
-    } else {
-      addStat('外形（幅×奥行き×高さ）', `${s.width} × ${s.depth} × ${s.height} m`);
-    }
-    showEvidence(situationOfRequest, s.character);
+    lastResult = { stats: res.stats, request: plan.request, situation: situationOfRequest };
+    renderResultTexts();
     resultEl.hidden = false;
     preview ??= new Preview($('preview'));
-    await preview.show(res.glb, { print: s.print !== undefined });
+    await preview.show(res.glb, { print: res.stats.print !== undefined });
     resultEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
   } catch (e) {
     showMessage(e instanceof Error ? e.message : String(e), true);
@@ -458,7 +467,8 @@ makeBtn.addEventListener('click', async () => {
 });
 
 // 寄付（応援）ボタン
-renderDonate($('donate'), donateLinks(DONATE_CONFIG, document.documentElement.lang));
+const renderDonateButtons = () =>
+  renderDonate($('donate'), donateLinks(DONATE_CONFIG, lang(), (s) => t(s === 'ofuse' ? 'donate.ofuse' : 'donate.githubSponsors')));
 
 // プレビューの見る向き
 for (const btn of document.querySelectorAll<HTMLButtonElement>('.view-buttons button')) {
@@ -467,5 +477,25 @@ for (const btn of document.querySelectorAll<HTMLButtonElement>('.view-buttons bu
 
 clearCacheBtn.addEventListener('click', async () => {
   await call({ type: 'clearCache' });
-  showMessage('保存していた PLATEAU データを消しました。');
+  showMessage(t('cacheCleared'));
 });
+
+// 言語の切り替え（最初はブラウザの言語。選んだものを覚える）
+function renderDynamicTexts(): void {
+  renderSituationSelect();
+  renderPlace();
+  renderMapHint();
+  areaMap?.setAttributionLabel(t('map.attribution'));
+  updatePrintUi();
+  renderDonateButtons();
+  renderResultTexts();
+  preview?.relabel();
+  // 前の言語の知らせは消す（中身が古い言語のままになるため）
+  showMessage('');
+  if (progressEl.hidden === false && !busy) progressEl.hidden = true;
+}
+langSelect.value = lang();
+langSelect.addEventListener('change', () => setLang(langSelect.value as Lang));
+onLangChange(renderDynamicTexts);
+applyStatic(document);
+renderDynamicTexts();

@@ -1,10 +1,12 @@
 // 出典（クレジット）の文を作る。PlotBlock の素材のクレジット欄にそのまま貼れる形にする。
 import type { FeatureType, SourceFile } from './catalog.js';
+import type { Text } from './situation.js';
 
 export const DATASET_NAMES: Record<FeatureType, string> = {
   bldg: '建築物モデル',
   tran: '道路モデル',
 };
+const DATASET_NAMES_EN: Record<string, string> = { 建築物モデル: 'building model', 道路モデル: 'road model' };
 
 /** PLATEAU のデータの利用条件（2026-11 時点。公式サイトポリシーで要確認） */
 export const LICENSE_TEXT = '公共データ利用規約（第1.0版）（CC BY 4.0 互換）';
@@ -34,7 +36,7 @@ export interface UsedFile {
 
 export function buildCredit(
   used: UsedFile[],
-  area: { description: string; createdAt: string; /** 追加の加工の内容（3Dプリンタ用など） */ processing?: string[] },
+  area: { description: Text; createdAt: string; /** 追加の加工の内容（3Dプリンタ用など） */ processing?: Text[] },
 ): CreditInfo {
   const byCity = new Map<string, CreditSource>();
   for (const { file, cityCodes } of used) {
@@ -73,16 +75,42 @@ export function buildCredit(
   }
   lines.push('');
   lines.push('【加工の内容】');
-  lines.push(`・${area.description}`);
+  lines.push(`・${area.description.ja}`);
   lines.push('・形を軽くする（建物の底面を省く、面の細かな情報や PLATEAU の写真の模様は使わない）');
   lines.push('・建物の地面の高さを 0 にそろえて並べ直す（地形は含まない）');
   if (used.some((u) => u.file.type === 'tran')) lines.push('・道路は範囲の形に切り取り、平らな板にする');
-  for (const p of area.processing ?? []) lines.push(`・${p}`);
+  for (const p of area.processing ?? []) lines.push(`・${p.ja}`);
   lines.push('');
   lines.push('このファイルは、上記のデータをもとに PLATEAUtoGLB で加工して作成したものです。');
   lines.push('GLB・OBJ・STL のどの形式で使うときも、また 3D プリントした物や画像・映像にして使うときも、この出典を表示してください。');
   lines.push('国土交通省・各自治体が作成したものではありません。');
   lines.push(`利用条件の詳細：${SITE_POLICY_URL}`);
   lines.push(`作成日：${area.createdAt}`);
+
+  // 英訳（参考）。正式な出典は上の日本語の原文
+  const hasRoads = used.some((u) => u.file.type === 'tran');
+  lines.push('');
+  lines.push('----');
+  lines.push('[English translation for reference. The Japanese text above is the original.]');
+  lines.push('Source:');
+  lines.push(
+    `Processed from ${sources.map((s) => `"3D City Model (Project PLATEAU) ${s.cityName} (FY${s.year})" (Ministry of Land, Infrastructure, Transport and Tourism)`).join(', ')}`,
+  );
+  for (const s of sources) {
+    lines.push(`- ${s.cityName} (municipality code ${s.cityCode}, FY${s.year})`);
+    lines.push(`  Data used: ${s.datasets.map((d) => DATASET_NAMES_EN[d] ?? d).join(', ')}`);
+    lines.push('  License: Public Data License (Version 1.0) (compatible with CC BY 4.0)');
+  }
+  lines.push('Processing:');
+  lines.push(`- ${area.description.en}`);
+  lines.push('- Simplified shapes (no building bottoms, no detailed surface data, no PLATEAU photo textures)');
+  lines.push('- Placed buildings with their ground level at height 0 (terrain not included)');
+  if (hasRoads) lines.push('- Clipped roads to the area and made them flat plates');
+  for (const p of area.processing ?? []) lines.push(`- ${p.en}`);
+  lines.push('This file was made by processing the data above with PLATEAUtoGLB.');
+  lines.push('Show this attribution whenever you use the result, in any format (GLB, OBJ, STL) and also for 3D prints, images and videos.');
+  lines.push('This is not made by the Ministry of Land, Infrastructure, Transport and Tourism or any municipality.');
+  lines.push(`Terms of use: ${SITE_POLICY_URL}`);
+  lines.push(`Created: ${area.createdAt}`);
   return { sources, short, text: lines.join('\n') + '\n' };
 }
