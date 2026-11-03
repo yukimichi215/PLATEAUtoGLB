@@ -3,6 +3,7 @@
 import listJson from './city-list.json';
 import { groupByPref, PREF_ROMAJI, type CityEntry, type CityList, type Lod3Place, type LodFilter } from './city-list.js';
 import { lang, t } from './i18n/index.js';
+import { pickable, setPicked } from './pick.js';
 
 export const CITY_LIST = listJson as CityList;
 
@@ -69,7 +70,11 @@ export class CityListView {
     b.appendChild(name);
     if (c.lod2) b.appendChild(badge('LOD2', t('cities.badge.lod2')));
     if (c.lod3) b.appendChild(badge('LOD3', t('cities.badge.lod3')));
-    b.addEventListener('click', () => this.handlers.onCity(c));
+    pickable(b, `city:${c.code}`);
+    b.addEventListener('click', () => {
+      setPicked(`city:${c.code}`);
+      this.handlers.onCity(c);
+    });
     li.appendChild(b);
     // LOD3 の場所は、LOD3 で絞り込んだときだけ出す（一覧を長くしないため）
     if (this.filter === 'lod3') {
@@ -81,7 +86,11 @@ export class CityListView {
         const pb = document.createElement('button');
         pb.type = 'button';
         pb.textContent = t('cities.lod3Place', { i: i + 1, count: p.lod3Count, mb: Math.max(1, p.mb) });
-        pb.addEventListener('click', () => this.handlers.onLod3Place(c, p, i));
+        pickable(pb, `lod3:${c.code}:${i}`);
+        pb.addEventListener('click', () => {
+          setPicked(`lod3:${c.code}:${i}`);
+          this.handlers.onLod3Place(c, p, i);
+        });
         pli.appendChild(pb);
         sub.appendChild(pli);
       });

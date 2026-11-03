@@ -8,6 +8,13 @@
   --accent-text: #ffffff;
   --error: #c62828;
   --preview-bg: #e8ecf1;
+  /* 操作できる部品（ボタン・ドロップダウン・入力欄・選択肢・畳む欄の見出し）は、背景に溶け込まないよう
+     背景と違う色と、はっきりした枠線にそろえる。入力欄・選択肢は白、ボタンは薄い灰色 */
+  --control-bg: #ffffff;
+  --control-border: #8a94a1;
+  --button-bg: #eaeef3;
+  /* 選択中（選んだ選択肢・候補）の背景。ライト・ダークで同じくらい目立つように濃さを分ける */
+  --selected-bg: color-mix(in srgb, var(--accent) 14%, var(--card));
   color-scheme: light dark;
 }
 @media (prefers-color-scheme: dark) {
@@ -21,6 +28,10 @@
     --accent-text: #0b0d10;
     --error: #ff7b72;
     --preview-bg: #262b31;
+    --control-bg: #2a3038;
+    --control-border: #7c8795;
+    --button-bg: #323a44;
+    --selected-bg: color-mix(in srgb, var(--accent) 28%, var(--card));
   }
 }
 * { box-sizing: border-box; }
@@ -63,14 +74,19 @@ h2 { margin: 0 0 16px; padding-bottom: 12px; border-bottom: 1px solid var(--bord
 .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 input[type='search'], input[type='number'], select {
   font: inherit; padding: 8px 10px; border-radius: 8px;
-  border: 1px solid var(--border); background: var(--bg); color: var(--text);
+  border: 1px solid var(--control-border); background: var(--control-bg); color: var(--text);
 }
 input[type='search'] { flex: 1 1 260px; min-width: 0; }
 button, .button {
   font: inherit; padding: 8px 16px; border-radius: 8px; cursor: pointer;
-  border: 1px solid var(--border); background: var(--bg); color: var(--text);
+  border: 1px solid var(--control-border); background: var(--button-bg); color: var(--text);
   text-decoration: none; display: inline-block;
 }
+button:not(:disabled):hover, .button:hover, select:hover, input:hover { border-color: var(--accent); }
+input[type='checkbox'], input[type='radio'] { accent-color: var(--accent); }
+button:not(:disabled):active, .button:active { background: color-mix(in srgb, var(--accent) 20%, var(--button-bg)); }
+/* 選択中の候補（住所の検索・シチュエーション・対応地域の一覧）。範囲の選び方などの選択中と同じ青の強調にそろえる */
+button[aria-pressed='true'] { border-color: var(--accent); background: var(--selected-bg); box-shadow: inset 3px 0 0 var(--accent); font-weight: 600; }
 .primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; }
 button:disabled { opacity: .5; cursor: not-allowed; }
 .link { border: none; background: none; color: var(--accent); padding: 0; text-decoration: underline; }
@@ -119,8 +135,9 @@ footer { color: var(--muted); font-size: .85rem; padding-bottom: 32px; }
 
 /* 対応地域の一覧 */
 .city-groups { margin-top: 8px; display: grid; gap: 4px; }
-.city-groups details.pref { border: 1px solid var(--border); border-radius: 8px; padding: 4px 10px; }
-.city-groups details.pref > summary { cursor: pointer; padding: 6px 0; font-weight: 600; }
+.city-groups details.pref { border: 1px solid var(--control-border); border-radius: 8px; overflow: hidden; background: var(--card); }
+.city-groups details.pref > summary { cursor: pointer; padding: 10px; font-weight: 600; background: var(--button-bg); }
+.city-groups details.pref > ul { margin: 8px 10px 10px; }
 .city-items { list-style: none; padding: 0; margin: 4px 0 8px; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(150px, 100%), 1fr)); gap: 6px; }
 .city-items > li:has(.lod3-places) { grid-column: 1 / -1; }
 .city-items button.city { width: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; text-align: left; }
@@ -142,22 +159,24 @@ footer { color: var(--muted); font-size: .85rem; padding-bottom: 32px; }
 .indent { margin-left: 26px; }
 
 /* 1つだけ選ぶ（横に並ぶボタン）：地図アプリの表示切り替えのような見た目 */
-.segmented > label { display: inline-flex; align-items: center; gap: 6px; margin: 0 6px 6px 0; padding: 8px 14px; border: 1px solid var(--border); border-radius: 999px; background: var(--bg); cursor: pointer; }
-.segmented > label:has(input:checked) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--card)); font-weight: 600; }
+.segmented > label { display: inline-flex; align-items: center; gap: 6px; margin: 0 6px 6px 0; padding: 8px 14px; border: 1px solid var(--control-border); border-radius: 999px; background: var(--control-bg); cursor: pointer; }
+.segmented > label:has(input:checked) { border-color: var(--accent); background: var(--selected-bg); font-weight: 600; }
+.segmented > label:hover, .choices > label:hover { border-color: var(--accent); }
 .segmented > label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* 1つだけ選ぶ（縦に並ぶ選択肢） */
-.choices > label { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
+.choices > label { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--control-border); border-radius: 8px; background: var(--control-bg); cursor: pointer; }
 .choices > label + label { margin-top: 6px; }
-.choices > label:has(input:checked) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--card)); }
+.choices > label:has(input:checked) { border-color: var(--accent); background: var(--selected-bg); box-shadow: inset 3px 0 0 var(--accent); }
 .choices > label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
 .print-same { color: var(--muted); font-size: .85rem; }
 
 /* 畳んだ枠（ほかの探し方・詳しい設定） */
 /* 中の一覧が広くても、画面からはみ出さないように（minmax(0, 1fr)・min-width: 0） */
 .other-ways { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
-details.panel { border: 1px solid var(--border); border-radius: 10px; background: var(--bg); min-width: 0; }
-details.panel > summary { cursor: pointer; padding: 12px 14px; list-style: none; }
+details.panel { border: 1px solid var(--control-border); border-radius: 10px; background: var(--bg); min-width: 0; overflow: hidden; }
+details.panel > summary { cursor: pointer; padding: 12px 14px; list-style: none; background: var(--button-bg); }
+details.panel > summary:hover, .city-groups details.pref > summary:hover { background: color-mix(in srgb, var(--accent) 12%, var(--button-bg)); }
 details.panel > summary::-webkit-details-marker { display: none; }
 /* 矢印は見出しと一緒に置き、補足の文だけが次の行へ折り返す */
 details.panel > summary .summary-title::before { content: '▸'; display: inline-block; width: 1.1em; color: var(--muted); }
