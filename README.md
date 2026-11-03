@@ -95,6 +95,8 @@ npm run dev
 | `npm run check-situations` | シチュエーション検索の候補の地域に、PLATEAU の建物のデータがあるかとファイルの大きさを、データカタログで確かめる（データ本体は取らない。国土地理院の住所検索で名前の位置との距離も出す） |
 | `npm run verify -- out/xxx.glb out/xxx.obj out/xxx.stl` | GLB を glTF Validator と three.js で、OBJ・STL を three.js の OBJLoader・STLLoader で検査し、外形・三角形の数・部品の数（GLB は Buildings・Roads・Ground ごと）を表示。STL は印刷できる形か（開いた辺・3つ以上の面が共有する辺・部品の数・体積が正か・台座から浮いた部品）も表示 |
 
+寄付（応援）ボタン：`src/web/donate-config.ts` に OFUSE と GitHub Sponsors の URL（https のみ）を書くと、画面の右上にボタンが出る。空ならボタンは出ない。ただのリンクで、外部のスクリプト・画像は読み込まない（絵はアプリに同梱の自作のもの）。
+
 PR を出す前の検証：`npm run typecheck`、`npm test`、`npm run build` がすべて通ること。
 GLB の出力を変えたときは、さらに実データで `npm run cli` と `npm run verify` を実行し、見た目に関わる変更は画面のプレビューのスクリーンショットで確かめる。
 
