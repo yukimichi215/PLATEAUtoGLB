@@ -67,9 +67,8 @@ export function toObj(
       }
       const idx = part.indices;
       for (let t = 0; t < idx.length; t += 3) {
-        const a = local[idx[t]!]!, b = local[idx[t + 1]!]!, c = local[idx[t + 2]!]!;
-        if (a === b || b === c || a === c) continue; // 丸めでつぶれた三角形
-        faceLines.push(`f ${a} ${b} ${c}`);
+        // 丸めで頂点が重なった（面積ほぼ 0 の）三角形も、三角形の数を GLB・STL とそろえるため残す
+        faceLines.push(`f ${local[idx[t]!]!} ${local[idx[t + 1]!]!} ${local[idx[t + 2]!]!}`);
       }
     }
   }
