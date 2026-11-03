@@ -80,3 +80,31 @@ export function meshCodesForPolygon(points: LatLon[]): string[] {
     return false;
   });
 }
+
+/**
+ * 続けて打った、ほぼ同じ場所の点（min m 未満）を1つにまとめる（最後と最初の点も）。
+ * ダブルクリックなどで同じ点が2つできると、線が交差しているように見えてしまうため
+ */
+export function dedupePolygon(points: LatLon[], min = 0.5): LatLon[] {
+  if (points.length === 0) return [];
+  const projector = new LocalProjector(points[0]!);
+  const xz = points.map((p) => projector.toXZ(p.lat, p.lon));
+  const keep: number[] = [];
+  for (let i = 0; i < points.length; i++) {
+    const last = keep[keep.length - 1];
+    if (last !== undefined && Math.hypot(xz[i]![0] - xz[last]![0], xz[i]![1] - xz[last]![1]) < min) continue;
+    keep.push(i);
+  }
+  while (keep.length > 1) {
+    const a = xz[keep[0]!]!, b = xz[keep[keep.length - 1]!]!;
+    if (Math.hypot(a[0] - b[0], a[1] - b[1]) >= min) break;
+    keep.pop();
+  }
+  return keep.map((i) => points[i]!);
+}
+
+/** 範囲の面積（m²）。囲んだ形があればその形の面積、なければ一辺 size の正方形 */
+export function areaM2(size: number, polygon?: LatLon[]): number {
+  if (!polygon || polygon.length < 3) return size * size;
+  return ringArea(localRingOf(polygon, areaOfPolygon(polygon).center));
+}

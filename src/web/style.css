@@ -78,6 +78,11 @@ label.inline { display: flex; flex-direction: row; align-items: center; gap: 6px
 .preview { position: relative; width: 100%; aspect-ratio: 16 / 10; background: var(--preview-bg); border-radius: 8px; overflow: hidden; touch-action: none; }
 .preview-scale { position: absolute; left: 8px; bottom: 8px; padding: 2px 8px; border-radius: 6px; background: var(--card); color: var(--text); font-size: .8rem; opacity: .85; pointer-events: none; }
 .view-buttons { margin-top: 8px; }
+.situation { margin-top: 8px; }
+.situation summary { cursor: pointer; }
+.situation label { display: block; margin-top: 8px; }
+.situation-evidence { margin-top: 12px; padding: 8px 12px; border-left: 3px solid var(--muted); }
+.situation-evidence h3 { margin: 0 0 4px; font-size: 1rem; }
 .stats { display: grid; grid-template-columns: max-content 1fr; gap: 2px 16px; margin: 12px 0; }
 .stats dt { color: var(--muted); }
 .stats dd { margin: 0; }

@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "cli": "tsx scripts/cli.ts",
-    "verify": "tsx scripts/verify-glb.ts"
+    "verify": "tsx scripts/verify-glb.ts",
+    "check-situations": "tsx scripts/check-situations.ts"
   },
   "dependencies": {
     "@gltf-transform/core": "^4.5.1",
