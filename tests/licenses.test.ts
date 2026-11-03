@@ -1,4 +1,6 @@
-import { readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ALLOWED_LICENSES, licenseText, packageOf, readPackageLicense } from '../scripts/lib/licenses.js';
 
@@ -28,5 +30,25 @@ describe('組み込んだ部品のライセンス一覧', () => {
     expect(text).toContain(three.texts[0]!.text.split('\n')[0]!);
     expect(text).toContain('- earcut');
     expect(() => licenseText(['three'], '/nonexistent')).toThrow();
+  });
+
+  it('manifold-3d を組み込んだときは、WASM の中の Clipper2（BSL-1.0）も本文ごと載せる', () => {
+    const text = licenseText(['manifold-3d']);
+    expect(text).toContain('- Clipper2 (BSL-1.0)');
+    expect(text).toContain('Boost Software License - Version 1.0');
+    expect(licenseText(['three'])).not.toContain('Clipper2');
+  });
+
+  it('許していないライセンス（GPL など）の部品が入ると止める', () => {
+    const root = mkdtempSync(join(tmpdir(), 'lic-'));
+    try {
+      const dir = join(root, 'node_modules', 'gpl-pkg');
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'gpl-pkg', version: '1.0.0', license: 'GPL-3.0-only' }));
+      writeFileSync(join(dir, 'LICENSE'), 'GNU GENERAL PUBLIC LICENSE');
+      expect(() => licenseText(['gpl-pkg'], root)).toThrow(/gpl-pkg（GPL-3.0-only/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
