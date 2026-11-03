@@ -1,7 +1,7 @@
 # PLATEAUtoGLB
 
 住所や地名を入れると、その周りの建物（と道路）を、国土交通省の [PLATEAU（3D都市モデル）](https://www.mlit.go.jp/plateau/) から切り出して、
-3D モデル（GLB・OBJ・STL）にするツールです。3D プリンタ・Blender などの編集ソフト・[PlotBlock](https://github.com/yukimichi215/plot-block) などで使えます。
+3D モデル（GLB・OBJ・STL）にするツールです。3D プリンタ・Blender などの編集ソフト・[PlotBlock](https://app.plotblock.net/) などで使えます。
 
 ## できること（初版）
 
