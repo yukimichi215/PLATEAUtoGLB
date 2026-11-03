@@ -8,7 +8,8 @@ export interface Lod3Place {
   lon: number;
   /** そのメッシュの建物のファイルの大きさ（MB、展開後） */
   mb: number;
-  /** この位置を中心にした一辺 300m の正方形に入る、LOD3（窓・扉まで）の建物の数 */
+  /** この位置を中心にした一辺 300m の正方形に入る、LOD3（窓・扉まで）の建物の数。そのメッシュのファイルだけで数えるので、
+   *  正方形がとなりのメッシュにかかると実際はもっと入る（画面では「◯棟以上」と出す） */
   lod3Count: number;
 }
 
@@ -25,6 +26,8 @@ export interface CityEntry {
   lod3: boolean;
   lod3Meshes?: number;
   lod3Places?: Lod3Place[];
+  /** LOD3 の候補の場所がないときの理由。tooLarge：ファイルが大きすぎる、notChecked：読む量の上限で調べきれなかった、noLod3：LOD3 の建物が見つからなかった */
+  lod3NoPlace?: 'tooLarge' | 'notChecked' | 'noLod3';
   /** データの年度（いちばん新しいもの） */
   year: number;
 }

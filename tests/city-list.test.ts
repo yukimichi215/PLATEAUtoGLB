@@ -54,6 +54,12 @@ describe('対応地域の一覧', () => {
     }
   });
 
+  it('LOD3 があって候補の場所がない自治体には、その理由がある', () => {
+    for (const c of list.cities) {
+      if (c.lod3 && !c.lod3Places?.length) expect(['tooLarge', 'notChecked', 'noLod3'], c.name).toContain(c.lod3NoPlace);
+    }
+  });
+
   it('沼津市（LOD3 の代表の地域）に LOD3 の場所がある', () => {
     const numazu = list.cities.find((c) => c.code === '22203');
     expect(numazu?.lod3).toBe(true);

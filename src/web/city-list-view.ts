@@ -88,7 +88,7 @@ export class CityListView {
       if (places.length === 0) {
         const note = document.createElement('li');
         note.className = 'hint';
-        note.textContent = t('cities.lod3None');
+        note.textContent = t(`cities.lod3None.${c.lod3NoPlace ?? 'noLod3'}`);
         sub.appendChild(note);
       }
       li.appendChild(sub);
