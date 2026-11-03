@@ -3,6 +3,9 @@ import { describe, expect, it } from 'vitest';
 import { checkGlb } from '../scripts/lib/check-glb.js';
 import { checkMesh } from '../scripts/lib/check-mesh.js';
 import type { SourceFile } from '../src/core/catalog.js';
+import type { Building } from '../src/core/citygml.js';
+import { LocalProjector, metersPerDegree } from '../src/core/geo.js';
+import { SceneBuilder } from '../src/core/scene.js';
 import { generateFromPlan, type AreaPlan, type AreaRequest, type OpenText } from '../src/core/pipeline.js';
 
 const FIXTURE: Record<string, string> = { bldg: 'bldg_tokyo_station.gml', tran: 'tran_sample.gml' };
@@ -92,5 +95,33 @@ describe('建物ごとに部品を分ける', () => {
     expect(b.groups.Buildings).toBe(1);
     expect(objNames(res.obj)).toEqual(['Buildings', 'Roads', 'Ground']);
     expect(checkMesh('stl', res.stl).printable!.pieces).toBe(1);
+  });
+
+  it('部品の名前が重なったら、後のものに番号を付けて分ける', () => {
+    const center = { lat: 35.68, lon: 139.76 };
+    const m = metersPerDegree(center.lat);
+    // 一辺 2m・高さ 5m の箱（x, z は中心からの m）
+    const box = (id: string, buildingId: string | undefined, x: number): Building => {
+      const sq = [[x, 0], [x + 2, 0], [x + 2, 2], [x, 2]];
+      const ring = (pts: number[][], h: number) => pts.flatMap(([px, pz]) => [center.lat - pz! / m.lat, center.lon + px! / m.lon, h]);
+      return {
+        id,
+        attrs: buildingId ? { buildingId } : {},
+        lod1: [
+          { exterior: ring(sq, 5), interiors: [] },
+          { exterior: ring([...sq].reverse(), 0), interiors: [] },
+        ],
+        lod2: [],
+        installations: [],
+        lod3: [],
+        installations3: [],
+      };
+    };
+    const scene = new SceneBuilder({ projector: new LocalProjector(center), half: 50, lod: 1, separate: true });
+    for (const b of [box('a', 'X-1', -20), box('b', 'X-1', -10), box('c', 'X-1_2', 0), box('d', undefined, 10)]) {
+      expect(scene.addBuilding(b)).toBe(true);
+    }
+    const names = scene.pieces().filter((p) => p.group === 'Buildings').map((p) => p.name);
+    expect(names).toEqual(['X-1', 'X-1_2', 'X-1_2_2', 'd']);
   });
 });
