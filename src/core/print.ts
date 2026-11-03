@@ -1,7 +1,7 @@
 // 3Dプリンタ用の仕上げ：縮尺を決め、台座を敷き、閉じた形の柱の下端・道路の高さを決める。
 import { MeshPart, SOLID_BOTTOM, SOLID_ROAD_TOP, type ModelPiece, type PartName, type Parts, type SceneBuilder } from './scene.js';
 import { minWidth2d } from './geometry.js';
-import { box, type Solid } from './solid.js';
+import { box, extrudeDown, type Solid } from './solid.js';
 import { unionSolids, type UnionGroup } from './union.js';
 
 export interface PrintOptions {
@@ -106,12 +106,16 @@ export async function finishForPrint(scene: SceneBuilder, half: number, opt: Pri
     { key: 'roof', solids: buildings.flat().map(resolve) },
     { key: 'road', solids: roads.map(resolve) },
   ];
-  if (baseM > 0) groups.push({ key: 'ground', solids: [box(-half, half, -baseM, 0, -half, half)] });
+  // 範囲：囲んだ形があればその形、なければ正方形。台座はちょうどその形、範囲の柱で外を切り落とす
+  const ring = scene.clipRing;
+  const prism = (top: number, bottom: number): Solid =>
+    ring ? extrudeDown(ringAt(ring, top), [], bottom)! : box(-half, half, bottom, top, -half, half);
+  if (baseM > 0) groups.push({ key: 'ground', solids: [prism(0, -baseM)] });
   // 印刷で 0.001 mm³ に満たないかけらは除き、0.01 mm より細かい凹凸はならす（実物の大きさに直して渡す）
   const result = await unionSolids(groups, {
     minVolume: 1e-3 / mmPerMeter ** 3,
     tolerance: PRINT_TOLERANCE_MM / mmPerMeter,
-    clipHalf: half,
+    clip: prism(1e5, -1e5),
   });
   let maxY = 0;
   for (const g of groups) {
@@ -128,10 +132,27 @@ export async function finishForPrint(scene: SceneBuilder, half: number, opt: Pri
     minFeatureMm,
     removedBuildings: scene.solids.buildings.length - buildings.length,
     removedRoads: scene.solids.roads.length - roads.length,
-    widthMm: r1(2 * half * mmPerMeter),
-    depthMm: r1(2 * half * mmPerMeter),
+    widthMm: r1((ring ? extent(ring, 0) : 2 * half) * mmPerMeter),
+    depthMm: r1((ring ? extent(ring, 1) : 2 * half) * mmPerMeter),
     heightMm: r1(maxY * mmPerMeter + opt.baseMm),
   };
+}
+
+/** 2次元の多角形 [x, z, ...] を、高さ y の3次元の輪にする */
+function ringAt(ring: number[], y: number): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < ring.length; i += 2) out.push(ring[i]!, y, ring[i + 1]!);
+  return out;
+}
+
+/** 2次元の多角形の、x（axis 0）または z（axis 1）の向きの幅 */
+function extent(ring: number[], axis: 0 | 1): number {
+  let lo = Infinity, hi = -Infinity;
+  for (let i = axis; i < ring.length; i += 2) {
+    lo = Math.min(lo, ring[i]!);
+    hi = Math.max(hi, ring[i]!);
+  }
+  return hi - lo;
 }
 
 /**

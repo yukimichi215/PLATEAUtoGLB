@@ -6,11 +6,12 @@ import { buildCredit, LICENSE_TEXT, type UsedFile } from './credit.js';
 import { LocalProjector, meshCodesForBox, type LatLon } from './geo.js';
 import { makeZip, stlHeader, toMtl, toObj, toStl } from './export.js';
 import { buildGlb, GROUPS } from './glb.js';
+import { localRingOf, MAX_SIZE, MIN_SIZE } from './area.js';
+import { isSimpleRing } from './geometry.js';
 import { finishForPrint, ROAD_PRINT_MM, scalePieces, validatePrint, type PrintInfo, type PrintOptions } from './print.js';
 import { SceneBuilder, type BuildingInfo, type MeshPart, type ModelPiece } from './scene.js';
 
-export const MIN_SIZE = 50;
-export const MAX_SIZE = 1000;
+export { areaOfPolygon, MAX_SIZE, MIN_SIZE } from './area.js';
 export const MIN_HEIGHT_SCALE = 1;
 export const MAX_HEIGHT_SCALE = 3;
 const UNKNOWN_SIZE_GUESS = 20e6;
@@ -39,6 +40,18 @@ export interface AreaRequest {
    * 3Dプリンタ用は1つの立体にまとめるので使わない（指定しても無視する）
    */
   separateBuildings?: boolean;
+  /**
+   * 地図の上で囲んだ範囲（緯度・経度の多角形。四角で囲んだときも4点の多角形）。
+   * 指定したときは、中心がこの中にある建物だけを入れ、道路・地面・台座はこの形で切る。
+   * center・size は、この多角形がちょうど入る正方形にする（areaOfPolygon で求める）
+   */
+  polygon?: LatLon[];
+}
+
+/** 囲んだ範囲を、中心から見たローカル座標の多角形 [x, z, ...] にする */
+function localRing(req: AreaRequest): number[] | undefined {
+  if (!req.polygon) return undefined;
+  return localRingOf(req.polygon, req.center);
 }
 
 export interface AreaPlan {
@@ -60,6 +73,17 @@ export function validateRequest(req: AreaRequest): void {
     throw new Error(`広さは ${MIN_SIZE}〜${MAX_SIZE} m の範囲で指定してください。`);
   }
   if (req.print) validatePrint(req.print);
+  if (req.polygon) {
+    if (req.polygon.length < 3) throw new Error('範囲は3点以上で囲んでください。');
+    const ring = localRing(req)!;
+    if (!isSimpleRing(ring)) throw new Error('範囲の線が交差しています。交差しないように囲み直してください。');
+    const half = req.size / 2 + 0.5;
+    for (let i = 0; i < ring.length; i++) {
+      if (Math.abs(ring[i]!) > half) {
+        throw new Error(`囲んだ範囲が大きすぎます（一辺 ${MAX_SIZE} m の正方形に入る大きさまで）。`);
+      }
+    }
+  }
   const k = req.heightScale ?? 1;
   if (!(k >= MIN_HEIGHT_SCALE && k <= MAX_HEIGHT_SCALE)) {
     throw new Error(`高さの強調は ${MIN_HEIGHT_SCALE}〜${MAX_HEIGHT_SCALE} 倍の範囲で指定してください。`);
@@ -170,6 +194,7 @@ export async function generateFromPlan(
     solid: req.print !== undefined,
     heightScale: req.heightScale ?? 1,
     separate: separateOf(req),
+    clip: localRing(req),
   });
   const used: UsedFile[] = [];
 
@@ -215,7 +240,10 @@ export async function generateFromPlan(
   const createdAt = today();
   const place = req.placeName?.trim() || `${req.center.lat.toFixed(5)},${req.center.lon.toFixed(5)}`;
   const detail = detailLabel(req);
-  const description = `「${place}」を中心に一辺 ${req.size} m の範囲を切り出し（中心 緯度 ${req.center.lat.toFixed(6)}・経度 ${req.center.lon.toFixed(6)}）、${detail}の建物にする`;
+  const range = req.polygon
+    ? `地図の上で囲んだ範囲（${req.polygon.length} 点の多角形。ちょうど入る正方形の一辺 ${req.size} m）を切り出し`
+    : `を中心に一辺 ${req.size} m の範囲を切り出し`;
+  const description = `「${place}」${req.polygon ? 'の' : ''}${range}（中心 緯度 ${req.center.lat.toFixed(6)}・経度 ${req.center.lon.toFixed(6)}）、${detail}の建物にする`;
   const processing = print
     ? [
         `3Dプリンタ用に、縮尺 ${print.scaleLabel}（印刷したときの大きさ 幅 ${print.widthMm} × 奥行き ${print.depthMm} × 高さ ${print.heightMm} mm）にする`,
@@ -254,6 +282,7 @@ export async function generateFromPlan(
         installations: !req.print && req.lod >= 2 && req.installations === true,
         heightScale,
         separateBuildings: separateOf(req),
+        ...(req.polygon ? { polygon: req.polygon.map((p) => [p.lat, p.lon]) } : {}),
         origin: print
           ? '範囲の中心・台座の上面が高さ0。単位はメートル（縮尺をかけた大きさ）、+Y が上、-Z が北'
           : '範囲の中心・地面の高さ0。単位はメートル、+Y が上、-Z が北',
@@ -270,7 +299,7 @@ export async function generateFromPlan(
   const glbPieces = print ? scalePieces(pieces, print.mmPerMeter / 1000) : pieces;
   const meshPieces = print ? scalePieces(pieces, print.mmPerMeter) : pieces;
   const glb = await buildGlb({ pieces: glbPieces, copyright: credit.short, extras, name: `PLATEAU_${safeFileName(place)}` });
-  const fileName = `plateau_${safeFileName(place)}_${req.size}m_${detailCode(req)}${heightScale !== 1 ? `_h${heightScale}x` : ''}${separateOf(req) ? '_parts' : ''}`;
+  const fileName = `plateau_${safeFileName(place)}_${req.size}m_${detailCode(req)}${heightScale !== 1 ? `_h${heightScale}x` : ''}${separateOf(req) ? '_parts' : ''}${req.polygon ? '_area' : ''}`;
   const obj = toObj(
     meshPieces,
     credit.text,
