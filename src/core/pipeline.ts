@@ -1,12 +1,12 @@
 // 「場所と広さ → 必要なファイルを調べる → 読む → GLB にする」の流れ。
 // 画面（ブラウザ）からもコマンド（Node.js）からも同じものを使う。
-import { findSourceFiles, type FeatureType, type FetchJson, type SourceFile } from './catalog.js';
+import { fetchCatalogJson, findSourceFiles, type FeatureType, type FetchJson, type SourceFile } from './catalog.js';
 import { readCityGml } from './citygml.js';
 import { buildCredit, LICENSE_TEXT, type UsedFile } from './credit.js';
 import { LocalProjector, meshCodesForBox, type LatLon } from './geo.js';
 import { makeZip, stlHeader, toMtl, toObj, toStl } from './export.js';
 import { buildGlb, GROUPS } from './glb.js';
-import { areaM2, localRingOf, MAX_SIZE, meshCodesForPolygon, MIN_SIZE, polygonIssue } from './area.js';
+import { areaM2, localRingOf, MAX_SIZE, meshCodesForArea, MIN_SIZE, polygonIssue } from './area.js';
 import { finishForPrint, ROAD_PRINT_MM, scalePieces, validatePrint, type PrintInfo, type PrintOptions } from './print.js';
 import { areaCharacter, type AreaCharacter, type Text } from './situation.js';
 import { SceneBuilder, type BuildingInfo, type MeshPart, type ModelPiece } from './scene.js';
@@ -95,7 +95,7 @@ export function validateRequest(req: AreaRequest): void {
 export async function planArea(req: AreaRequest, fetchJson: FetchJson): Promise<AreaPlan> {
   validateRequest(req);
   // 囲んだ形のときは、形に重なるメッシュだけを取る（正方形の余白・形のへこみの分まで取らない）
-  const meshes = req.polygon ? meshCodesForPolygon(req.polygon) : meshCodesForBox(new LocalProjector(req.center).boxAround(req.size / 2));
+  const meshes = meshCodesForArea(req);
   const types: FeatureType[] = req.includeRoads ? ['bldg', 'tran'] : ['bldg'];
   const files = await findSourceFiles(meshes, types, fetchJson);
   const totalBytes = files.reduce((s, f) => s + f.fileSize, 0);
@@ -451,11 +451,8 @@ export function downloadFiles(result: GenerateResult): Record<DownloadKind, Down
 }
 
 /** 標準の fetch を使って JSON を取る */
-export const defaultFetchJson: FetchJson = async (url) => {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`PLATEAU データカタログへの問い合わせに失敗しました（${res.status}）`);
-  return res.json();
-};
+/** データのない場所（404）は空の答えとして扱う（catalog.ts の fetchCatalogJson） */
+export const defaultFetchJson: FetchJson = fetchCatalogJson;
 
 /** Response の本文を、文字列の流れにする（読んだバイト数を知らせる） */
 export async function* responseText(res: Response, onBytes: (n: number) => void): AsyncIterable<string> {

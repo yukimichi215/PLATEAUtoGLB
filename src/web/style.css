@@ -110,3 +110,6 @@ fieldset.use { margin-top: 12px; }
 .map { height: 360px; border-radius: 8px; border: 1px solid var(--border); }
 .map.drawing { cursor: crosshair; user-select: none; -webkit-user-select: none; }
 .map-tools { margin-top: 8px; }
+/* PLATEAU の建物データがある所の枠の見本（area-map.ts の COVERAGE_STYLE と同じ色） */
+.coverage-swatch { display: inline-block; width: 12px; height: 12px; margin-right: 6px; vertical-align: -1px; border: 1px solid #2e7d32; background: rgba(67, 160, 71, 0.15); }
+.coverage-note.error { color: var(--error); font-weight: 600; }

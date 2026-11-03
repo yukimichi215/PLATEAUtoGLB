@@ -1,5 +1,8 @@
 // 画面の操作。重い処理は worker.ts に任せる。
-import { areaOfPolygon, MAX_SIZE } from '../core/area.js';
+import { areaOfPolygon, MAX_SIZE, meshCodesForArea } from '../core/area.js';
+import { fetchCatalogJson } from '../core/catalog.js';
+import { CoverageIndex, type AreaCoverage } from '../core/coverage.js';
+import type { LatLonBox } from '../core/geo.js';
 import { searchPlace, type Place } from '../core/geocode.js';
 import type { AreaPlan, AreaRequest, DownloadKind, GenerateStats } from '../core/pipeline.js';
 import type { PrintOptions } from '../core/print.js';
@@ -55,6 +58,8 @@ const mapTools = $<HTMLDivElement>('map-tools');
 const mapUndo = $<HTMLButtonElement>('map-undo');
 const mapFinish = $<HTMLButtonElement>('map-finish');
 const mapHint = $<HTMLParagraphElement>('map-hint');
+const coverageNote = $<HTMLParagraphElement>('coverage-note');
+const mapLegend = $<HTMLSpanElement>('map-legend');
 const situationSelect = $<HTMLSelectElement>('situation-select');
 const situationNote = $<HTMLParagraphElement>('situation-note');
 const situationPlaces = $<HTMLUListElement>('situation-places');
@@ -134,11 +139,15 @@ function selectPlace(p: Place, situation: Situation | null = null, name: Text | 
   renderPlace();
   mapWrap.hidden = false;
   mapNeedPlace.hidden = true;
-  areaMap ??= new AreaMap($('map'), onDrawChange, t('map.attribution'));
+  if (!areaMap) {
+    areaMap = new AreaMap($('map'), onDrawChange, t('map.attribution'));
+    areaMap.onViewChange(showCoverageOnMap);
+  }
   areaMap.setMode(currentAreaMode());
   areaMap.show({ lat: p.lat, lon: p.lon }, Number(sizeEl.value));
   setBusy(busy);
   showMessage('');
+  void checkCoverage();
 }
 
 /** 選んだ場所の表示（シチュエーションの候補なら、その言語の名前） */
@@ -164,6 +173,7 @@ function onDrawChange(s: DrawState): void {
   renderMapHint();
   setBusy(busy);
   updatePrintUi();
+  if (s.polygon || s.mode === 'square') void checkCoverage();
 }
 
 function renderMapHint(): void {
@@ -192,7 +202,77 @@ for (const el of document.querySelectorAll<HTMLInputElement>('input[name="area"]
 mapUndo.addEventListener('click', () => areaMap?.undoPoint());
 mapFinish.addEventListener('click', () => areaMap?.finishPolygon());
 $<HTMLButtonElement>('map-clear').addEventListener('click', () => areaMap?.clearDrawing());
-sizeEl.addEventListener('change', () => areaMap?.setSize(Number(sizeEl.value)));
+sizeEl.addEventListener('change', () => {
+  areaMap?.setSize(Number(sizeEl.value));
+  void checkCoverage();
+});
+
+// PLATEAU の建物データがある場所か（データカタログ API。約10km 四方ごとに1回だけ問い合わせて覚える）
+const coverage = new CoverageIndex(fetchCatalogJson);
+type CoverageState = { kind: 'checking' } | { kind: 'failed' } | { kind: 'done'; result: AreaCoverage };
+let coverageState: CoverageState | null = null;
+let coverageToken = 0;
+/** 地図の枠：null は「広く表示しているので出さない」 */
+let legendZoomedOut = false;
+
+/** 今の切り出す範囲に重なる3次メッシュ（作るときと同じ数え方。正方形か、囲み終えた形） */
+function currentAreaMeshes(): string[] | null {
+  if (!selected) return null;
+  if (draw.mode === 'square') return meshCodesForArea({ center: selected, size: Number(sizeEl.value) });
+  return draw.polygon && !draw.issue ? meshCodesForArea({ center: selected, size: 0, polygon: draw.polygon }) : null;
+}
+
+async function checkCoverage(): Promise<void> {
+  const meshes = currentAreaMeshes();
+  const token = ++coverageToken;
+  if (!meshes) {
+    coverageState = null;
+    renderCoverage();
+    return;
+  }
+  coverageState = { kind: 'checking' };
+  renderCoverage();
+  try {
+    const result = await coverage.areaCoverage(meshes);
+    if (token !== coverageToken) return;
+    coverageState = { kind: 'done', result };
+  } catch {
+    if (token !== coverageToken) return;
+    coverageState = { kind: 'failed' };
+  }
+  renderCoverage();
+}
+
+function renderCoverage(): void {
+  const s = coverageState;
+  let text = '';
+  let error = false;
+  if (s?.kind === 'checking') text = t('coverage.checking');
+  else if (s?.kind === 'failed') text = t('coverage.failed');
+  else if (s?.kind === 'done' && s.result.covered === 0) {
+    text = t('coverage.none');
+    error = true;
+  } else if (s?.kind === 'done' && s.result.covered < s.result.total) {
+    text = t('coverage.partial', { covered: s.result.covered, total: s.result.total });
+  }
+  coverageNote.textContent = text;
+  coverageNote.hidden = text === '';
+  coverageNote.classList.toggle('error', error);
+  mapLegend.textContent = t(legendZoomedOut ? 'map.legend.zoomOut' : 'map.legend');
+}
+
+/** 地図に見えている範囲の、データのある所の枠を出す（広く表示しすぎているときは出さない） */
+async function showCoverageOnMap(view: LatLonBox): Promise<void> {
+  try {
+    const cells = await coverage.cells(view);
+    legendZoomedOut = cells === null;
+    // 地図が動くたびに呼ばれる。問い合わせた結果は覚えているので、2回目からはすぐ出る
+    areaMap?.setCoverage(cells);
+  } catch {
+    areaMap?.setCoverage(null);
+  }
+  renderCoverage();
+}
 
 async function fetchJson(url: string): Promise<unknown> {
   const res = await fetch(url);
@@ -485,6 +565,7 @@ function renderDynamicTexts(): void {
   renderSituationSelect();
   renderPlace();
   renderMapHint();
+  renderCoverage();
   areaMap?.setAttributionLabel(t('map.attribution'));
   updatePrintUi();
   renderDonateButtons();
