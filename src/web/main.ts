@@ -1,8 +1,7 @@
 // 画面の操作。重い処理は worker.ts に任せる。
 import { searchPlace, type Place } from '../core/geocode.js';
-import type { AreaPlan, AreaRequest, DownloadFile, DownloadKind } from '../core/pipeline.js';
+import type { AreaPlan, AreaRequest, DownloadKind } from '../core/pipeline.js';
 import type { PrintOptions } from '../core/print.js';
-import { isDesktop, saveWithDialog } from './desktop.js';
 import { Preview } from './preview.js';
 import type { WorkerRequest, WorkerResponse } from './worker.js';
 
@@ -49,8 +48,6 @@ let selected: Place | null = null;
 let busy = false;
 let preview: Preview | null = null;
 const objectUrls: string[] = [];
-/** デスクトップ版で保存するための、できあがったファイルの中身 */
-let lastFiles: Record<DownloadKind, DownloadFile> | null = null;
 
 const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });
 
@@ -246,7 +243,6 @@ makeBtn.addEventListener('click', async () => {
       dlLinks[kind].href = url;
       dlLinks[kind].download = f.name;
     }
-    lastFiles = res.files;
     creditEl.textContent = res.credit;
 
     const s = res.stats;
@@ -303,21 +299,6 @@ makeBtn.addEventListener('click', async () => {
     setBusy(false);
   }
 });
-
-// デスクトップ版では、ダウンロードの代わりに「名前を付けて保存」の窓で保存する
-for (const key of DOWNLOAD_KINDS) {
-  dlLinks[key].addEventListener('click', async (ev) => {
-    if (!isDesktop() || !lastFiles) return;
-    ev.preventDefault();
-    const f = lastFiles[key];
-    try {
-      const saved = await saveWithDialog(f.name, f.data);
-      if (saved) showMessage(`${f.name} を保存しました。`);
-    } catch (e) {
-      showMessage(`保存できませんでした：${e instanceof Error ? e.message : String(e)}`, true);
-    }
-  });
-}
 
 clearCacheBtn.addEventListener('click', async () => {
   await call({ type: 'clearCache' });

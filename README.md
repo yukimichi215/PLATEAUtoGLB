@@ -46,16 +46,10 @@
 
 ## 使い方
 
-### Windows アプリ版（おすすめ）
+### ブラウザ版
 
-`PLATEAUtoGLB.exe` をダブルクリックすると起動します（インストール不要。Windows 10/11 64ビット・インターネット接続が必要）。
-
-exe は、main に取り込まれたときに GitHub の自動ビルドが作ります。
-GitHub のリポジトリの「Actions」→ いちばん新しい「build」→ 下の「Artifacts」の `PLATEAUtoGLB-windows` からダウンロードできます
-（保存は最新の1つだけ・7日間。消えていたら、main に変更が入ったときに作り直されます）。
-署名のないアプリなので、初回は「Windows によって PC が保護されました」と出ることがあります（「詳細情報」→「実行」）。
-
-### ブラウザ版（開発用。パソコンに Node.js が必要）
+ブラウザで動くアプリです（Windows 版はやめ、ブラウザ版に一本化しました）。作ったファイルはブラウザのダウンロードで保存します。
+Web での公開の方法は検討中です。それまでは、パソコンに Node.js を入れて次のように起動します。
 
 ```sh
 npm ci --ignore-scripts
@@ -64,7 +58,7 @@ npm run dev
 
 表示された `http://localhost:5173/` をブラウザで開きます。
 
-一度取った PLATEAU のデータは手元（アプリ・ブラウザの保存領域）に保存して使い回します（画面の一番下のリンクで消せます）。
+一度取った PLATEAU のデータは手元（ブラウザの保存領域）に保存して使い回します（画面の一番下のリンクで消せます）。
 東京の中心部などでは、1km 四方のデータが展開後 100〜200MB 程度あります（通信は圧縮されるので 1〜2 割程度）。
 
 ## データと出典
@@ -86,7 +80,6 @@ npm run dev
 | `npm test` | 自動テスト（`tests/`。小さな見本データ `tests/fixtures/` を使い、glTF Validator と three.js の GLTFLoader で GLB を検査） |
 | `npm run build` | 型チェックと公開用のファイル作成（`dist/`） |
 | `npm run cli -- --lat 35.6812 --lon 139.7671 --size 300 --lod 1 --name 東京駅` | コマンドで GLB を作る（`--format glb,obj,stl` で OBJ・STL も。出典の文章はいつも一緒に出す）（`--lod 2 --installations` で付属物、`--lod 3` で窓・扉）（取得したデータは `data/cache/` に保存。1ファイル200MB・合計1000MBを超えると中止） |
-| `npm run app:dev` / `npm run app:build` | Windows アプリ版の起動・ビルド（Rust と Tauri の準備が要る。通常は GitHub の自動ビルドで作る） |
 | `npm run cli -- … --print --scale 1000 --base-mm 3`（または `--fit-mm 100`） | 3D プリンタ用（縮尺・台座・閉じた形）で作る |
 | `npm run cli -- … --height-scale 1.5` | 建物の高さだけを 1.5 倍にする（1〜3） |
 | `npm run cli -- … --separate` | 建物を1棟ずつ別の部品にする（GLB・OBJ。3D プリンタ用では使わない） |
@@ -101,7 +94,6 @@ GLB の出力を変えたときは、さらに実データで `npm run cli` と 
 - `src/core/` … 画面とコマンドで共通の中身（場所→メッシュ番号、データカタログ、CityGML の読み取り、三角形分割、GLB 作成、OBJ・STL・zip の書き出し〔`export.ts`〕、3D プリンタ用の閉じた形〔`solid.ts`〕・縮尺と台座〔`print.ts`〕・1つの立体にまとめる計算〔`union.ts`。manifold-3d〕、出典）
 - `src/web/` … ブラウザの画面。重い処理は Web Worker（`worker.ts`）で行う
 - `scripts/` … コマンド（GLB 作成・検査）
-- `src-tauri/` … Windows アプリ版（Tauri）。画面は `dist/` をそのまま使い、保存だけ「名前を付けて保存」の窓（`save_file`）にする
-- `.github/workflows/build.yml` … 自動ビルド。PR では検査とビルドの確認だけ、main では exe を作って最新の1つだけ保存
+- `.github/workflows/build.yml` … 自動ビルド。PR と main で検査と画面のビルドができるかを確かめるだけ（できたファイルは保存しない）
 
-自動ビルド：PR では「検査（型チェック・テスト・画面のビルド）」と「Windows 版（exe）」が通ることを確かめる。
+自動ビルド：PR と main で「検査（型チェック・テスト・画面のビルド）」が通ることを確かめる（できたファイルは保存しない）。
