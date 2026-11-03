@@ -180,3 +180,6 @@ button.big { padding: 12px 28px; font-size: 1.05rem; width: 100%; }
 .downloads { gap: 8px; }
 .result h2 .step.done { background: #2e7d32; color: #fff; }
 footer details.more > p { font-size: .85rem; }
+/* 下の小さなリンクを、指でも押し分けやすく */
+footer .footer-links { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+footer .footer-links a, footer .footer-links button { padding: 6px 0; }

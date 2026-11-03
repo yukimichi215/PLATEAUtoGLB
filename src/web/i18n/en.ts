@@ -120,6 +120,7 @@ export const en: Record<MessageKey, string> = {
   'other.legend': 'Besides buildings',
   'other.roads': 'Roads',
   'other.ground': 'Ground plate',
+  'other.groundPrint': ' (for 3D printing, the base replaces the ground)',
   'detail.hint': 'Lower options are more detailed and make larger files. "Boxes" is recommended for phones.',
   'detail.printSameNote': 'For 3D printing, attachments, windows and doors are left out (same as "With roof shapes").',
   'detail.more': 'Attachments are balconies, eaves, rooftop equipment and the like; some areas have no such data. Window and door data (LOD3) exists only for some buildings, such as around Numazu Station and Toranomon; other buildings are made with roof shapes (with attachments) or boxes instead, and the number is shown. For 3D printing, attachments, windows and doors are too fine and are left out.',
