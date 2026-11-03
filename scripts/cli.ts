@@ -32,13 +32,15 @@ const { values } = parseArgs({
     'fit-mm': { type: 'string' },
     /** 台座の厚さ（mm。0 で台座なし） */
     'base-mm': { type: 'string', default: '3' },
+    /** 印刷するとこの mm より細い建物・道路を外す（0 で外さない） */
+    'min-mm': { type: 'string', default: '0.8' },
     /** 建物の高さだけを何倍にするか（1〜3） */
     'height-scale': { type: 'string', default: '1' },
   },
 });
 
 if (!values.lat || !values.lon) {
-  console.error('使い方: npm run cli -- --lat <緯度> --lon <経度> [--size 300] [--lod 1|2|3] [--installations] [--format glb,obj,stl] [--print [--scale 1000 | --fit-mm 100] [--base-mm 3]] [--height-scale 1.5] [--name 名前]');
+  console.error('使い方: npm run cli -- --lat <緯度> --lon <経度> [--size 300] [--lod 1|2|3] [--installations] [--format glb,obj,stl] [--print [--scale 1000 | --fit-mm 100] [--base-mm 3] [--min-mm 0.8]] [--height-scale 1.5] [--name 名前]');
   process.exit(1);
 }
 
@@ -112,8 +114,8 @@ const req = {
   heightScale: Number(values['height-scale']),
   print: values.print
     ? values['fit-mm'] !== undefined
-      ? { fitSideMm: Number(values['fit-mm']), baseMm: Number(values['base-mm']) }
-      : { scaleDenominator: Number(values.scale), baseMm: Number(values['base-mm']) }
+      ? { fitSideMm: Number(values['fit-mm']), baseMm: Number(values['base-mm']), minFeatureMm: Number(values['min-mm']) }
+      : { scaleDenominator: Number(values.scale), baseMm: Number(values['base-mm']), minFeatureMm: Number(values['min-mm']) }
     : undefined,
 };
 
@@ -151,6 +153,7 @@ if (formats.has('obj')) {
 if (formats.has('stl')) writeFileSync(`${base}.stl`, result.stl);
 writeFileSync(`${base}_credit.txt`, result.credit);
 writeFileSync(`${base}_buildings.json`, JSON.stringify(result.buildings, null, 1));
+for (const w of result.stats.warnings) console.error(`注意: ${w}`);
 const mem = process.memoryUsage();
 console.log(
   JSON.stringify(

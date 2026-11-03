@@ -138,12 +138,14 @@ export const ROAD_HEIGHT = 0.15;
 
 export class SceneBuilder {
   readonly parts: Record<PartName, MeshPart>;
-  /** 3Dプリンタ用（solid）のとき：まとめる前の閉じた形（建物の柱・道路の板） */
-  readonly solids: { buildings: Solid[]; roads: Solid[] } = { buildings: [], roads: [] };
+  /** 3Dプリンタ用（solid）のとき：まとめる前の閉じた形（建物ごとの柱の集まり・道路の板） */
+  readonly solids: { buildings: Solid[][]; roads: Solid[] } = { buildings: [], roads: [] };
   readonly buildings: BuildingInfo[] = [];
   readonly cities = new Set<string>();
   private readonly seen = new Set<string>();
   roadCount = 0;
+  /** 3Dプリンタ用：solids.roads の板が、何番目に入れた道路のものか（1本の道路が複数の板になることがある） */
+  private readonly solidRoadOf: number[] = [];
   /** 範囲内の建物のうち、形が読めずに省いた数 */
   skippedBuildings = 0;
 
@@ -164,6 +166,23 @@ export class SceneBuilder {
       road: new MeshPart(),
       ground: new MeshPart(),
     };
+  }
+
+  /**
+   * 3Dプリンタ用：keep[i] が false の建物を一覧（buildings）から除く。
+   * solids.buildings と buildings は同じ順に1棟ずつ入れている（addBuilding）ので、番号で対応させる
+   */
+  keepBuildings(keep: boolean[]): void {
+    if (keep.length !== this.buildings.length) throw new Error('建物の形と一覧の数が合いません');
+    const kept = this.buildings.filter((_, i) => keep[i]);
+    for (const [i, b] of this.buildings.entries()) if (!keep[i] && b.lodUsed === 3) this.lod3Buildings--;
+    this.buildings.splice(0, this.buildings.length, ...kept);
+  }
+
+  /** 3Dプリンタ用：keep[i] が false の道路の板を外したあとの、道路の本数にする（板が1枚でも残れば数える） */
+  keepRoads(keep: boolean[]): void {
+    if (keep.length !== this.solidRoadOf.length) throw new Error('道路の形と一覧の数が合いません');
+    this.roadCount = new Set(this.solidRoadOf.filter((_, i) => keep[i])).size;
   }
 
   /** 緯度経度の多角形をローカル座標（x, 標高, z）にする */
@@ -349,7 +368,7 @@ export class SceneBuilder {
         else failed++;
       }
       if (solids.length > 0) {
-        this.solids.buildings.push(...solids);
+        this.solids.buildings.push(solids);
         this.droppedFaces += failed;
         return true;
       }
@@ -398,6 +417,7 @@ export class SceneBuilder {
           if (solid.positions[i] === ROAD_HEIGHT) solid.positions[i] = SOLID_ROAD_TOP;
         }
         this.solids.roads.push(solid);
+        this.solidRoadOf.push(this.roadCount); // この道路が入ったときの番号
         added = true;
         continue;
       }

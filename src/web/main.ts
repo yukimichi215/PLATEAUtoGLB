@@ -22,6 +22,7 @@ const scaleEl = $<HTMLSelectElement>('scale');
 const fitLabel = $<HTMLLabelElement>('fit-label');
 const fitMmEl = $<HTMLInputElement>('fit-mm');
 const baseMmEl = $<HTMLInputElement>('base-mm');
+const minMmEl = $<HTMLInputElement>('min-mm');
 const overhangHint = $<HTMLSpanElement>('overhang-hint');
 const groundEl = $<HTMLInputElement>('ground');
 const makeBtn = $<HTMLButtonElement>('make-btn');
@@ -137,9 +138,10 @@ const isPrint = () => document.querySelector<HTMLInputElement>('input[name="use"
 function currentPrint(): PrintOptions | undefined {
   if (!isPrint()) return undefined;
   const baseMm = Number(baseMmEl.value);
+  const minFeatureMm = Number(minMmEl.value);
   return scaleEl.value === 'fit'
-    ? { fitSideMm: Number(fitMmEl.value), baseMm }
-    : { scaleDenominator: Number(scaleEl.value), baseMm };
+    ? { fitSideMm: Number(fitMmEl.value), baseMm, minFeatureMm }
+    : { scaleDenominator: Number(scaleEl.value), baseMm, minFeatureMm };
 }
 
 /** 3Dプリンタ用の設定の表示と、印刷したときの大きさの目安 */
@@ -224,6 +226,8 @@ makeBtn.addEventListener('click', async () => {
     const res = await call({ type: 'generate', plan }, (r, m) => setProgress(r, m));
     if (res.type !== 'done') throw new Error('予期しない応答');
     setProgress(1, '完成しました');
+    // 注意があれば、できあがりと一緒に目立つように出す
+    if (res.stats.warnings.length > 0) showMessage(res.stats.warnings.join('\n'), true);
 
     // ダウンロード用のリンク
     for (const u of objectUrls.splice(0)) URL.revokeObjectURL(u);
@@ -258,6 +262,12 @@ makeBtn.addEventListener('click', async () => {
       addStat('台座の厚さ', s.print.baseMm > 0 ? `${s.print.baseMm} mm` : 'なし');
       if (s.print.droppedFaces > 0) {
         addStat('形がくずれていて入れられなかった面', `${s.print.droppedFaces} 枚（屋根の一部・道路）`);
+      }
+      if (s.print.minFeatureMm > 0) {
+        addStat(
+          `細すぎて外したもの（${s.print.minFeatureMm} mm 未満）`,
+          `建物 ${s.print.removedBuildings} 棟・道路 ${s.print.removedRoads} か所`,
+        );
       }
     } else {
       addStat('外形（幅×奥行き×高さ）', `${s.width} × ${s.depth} × ${s.height} m`);

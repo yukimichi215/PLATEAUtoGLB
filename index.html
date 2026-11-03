@@ -87,6 +87,9 @@
           <label>台座の厚さ（mm。0 で台座なし）
             <input id="base-mm" type="number" min="0" max="50" step="0.5" value="3" />
           </label>
+          <label>細かすぎる部分を外す（印刷するとこの mm より細い建物・道路。0 で外さない）
+            <input id="min-mm" type="number" min="0" max="10" step="0.1" value="0.8" />
+          </label>
         </div>
         <p id="print-hint" class="hint" hidden></p>
         <p class="hint">中心が範囲の中にある建物を入れます。<span id="overhang-hint">大きな建物は範囲から少しはみ出すことがあります。</span>地形（坂や高低差）はまだ入りません。</p>
