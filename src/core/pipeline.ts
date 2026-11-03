@@ -98,6 +98,8 @@ export interface GenerateStats {
   lod3Buildings: number;
   /** 3Dプリンタ用のとき：縮尺・印刷したときの大きさ（mm） */
   print?: PrintInfo;
+  /** 利用者に知らせたい注意（できあがりに出す） */
+  warnings: string[];
 }
 
 export interface GenerateResult {
@@ -283,6 +285,10 @@ export async function generateFromPlan(
     }
   }
   const r1 = (v: number) => Math.round(v * 10) / 10;
+  const warnings: string[] = [];
+  if (print && scene.buildings.length === 0 && print.removedBuildings > 0) {
+    warnings.push('この縮尺では建物が細すぎて、すべて省きました。縮尺を大きくするか、「細かすぎる部分を外す」の mm を小さくしてください。');
+  }
   return {
     glb,
     obj,
@@ -305,6 +311,7 @@ export async function generateFromPlan(
       buildingsWithInstallations: scene.buildingsWithInstallations,
       lod3Buildings: scene.lod3Buildings,
       print,
+      warnings,
     },
   };
 }

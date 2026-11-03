@@ -153,6 +153,7 @@ if (formats.has('obj')) {
 if (formats.has('stl')) writeFileSync(`${base}.stl`, result.stl);
 writeFileSync(`${base}_credit.txt`, result.credit);
 writeFileSync(`${base}_buildings.json`, JSON.stringify(result.buildings, null, 1));
+for (const w of result.stats.warnings) console.error(`注意: ${w}`);
 const mem = process.memoryUsage();
 console.log(
   JSON.stringify(

@@ -226,6 +226,8 @@ makeBtn.addEventListener('click', async () => {
     const res = await call({ type: 'generate', plan }, (r, m) => setProgress(r, m));
     if (res.type !== 'done') throw new Error('予期しない応答');
     setProgress(1, '完成しました');
+    // 注意があれば、できあがりと一緒に目立つように出す
+    if (res.stats.warnings.length > 0) showMessage(res.stats.warnings.join('\n'), true);
 
     // ダウンロード用のリンク
     for (const u of objectUrls.splice(0)) URL.revokeObjectURL(u);

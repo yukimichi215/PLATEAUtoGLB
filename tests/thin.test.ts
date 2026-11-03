@@ -75,7 +75,12 @@ describe('細かすぎる部分の省略', () => {
     const thin = await generateFromPlan(plan({ scaleDenominator: 5000, baseMm: 0, minFeatureMm: 4 }), openText); // 実物で 20m
     const p = thin.stats.print!;
     expect(p.removedBuildings).toBeGreaterThan(0);
-    expect(p.removedBuildings).toBeLessThan(thin.stats.buildings); // 全部は消えない
+    // 棟数・建物の一覧は、外した建物を除いた「入れたもの」
+    expect(thin.stats.buildings).toBe(all.stats.buildings - p.removedBuildings);
+    expect(thin.buildings.length).toBe(thin.stats.buildings);
+    expect(thin.stats.roads).toBeLessThan(all.stats.roads); // 道路も、外したものを除いた本数
+    expect(thin.stats.buildings).toBeGreaterThan(0); // 全部は消えない
+    expect(thin.stats.warnings).toEqual([]);
     expect(p.removedRoads).toBeGreaterThan(0);
     // 残った部品は、どれも上から見て 4mm 以上の幅がある
     const pieces = piecesXY(thin.stl);
@@ -84,6 +89,15 @@ describe('細かすぎる部分の省略', () => {
     // 省略なしでは 4mm 未満の部品がある（＝確かめ方が意味を持つ）
     expect(piecesXY(all.stl).some((xy) => minWidth2d(xy) < 4)).toBe(true);
     expect(thin.credit).toContain(`印刷すると 4 mm より細い建物 ${p.removedBuildings} 棟・道路 ${p.removedRoads} か所を省く`);
+  });
+
+  it('すべての建物が細すぎて外れたときは、棟数 0 にして注意を出す', async () => {
+    const res = await generateFromPlan(plan({ scaleDenominator: 100000, baseMm: 2, minFeatureMm: 10 }, false), openText); // 実物で 1km
+    expect(res.stats.print!.removedBuildings).toBeGreaterThan(0);
+    expect(res.stats.buildings).toBe(0);
+    expect(res.buildings).toEqual([]);
+    expect(res.stats.warnings).toHaveLength(1);
+    expect(res.stats.warnings[0]).toContain('すべて省きました');
   });
 
   it('いちばん大きい建物は消えない（高さが変わらない）', async () => {

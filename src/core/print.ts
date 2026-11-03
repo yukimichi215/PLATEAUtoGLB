@@ -95,8 +95,13 @@ export async function finishForPrint(scene: SceneBuilder, half: number, opt: Pri
   const minFeatureMm = opt.minFeatureMm ?? DEFAULT_MIN_FEATURE_MM;
   const minWidthM = minFeatureMm / mmPerMeter;
   const wide = (solids: Solid[]) => minFeatureMm <= 0 || minWidth2d(solids.flatMap((s) => xzOf(s, half))) >= minWidthM;
-  const buildings = scene.solids.buildings.filter(wide);
-  const roads = scene.solids.roads.filter((r) => wide([r]));
+  const keep = scene.solids.buildings.map(wide);
+  const buildings = scene.solids.buildings.filter((_, i) => keep[i]);
+  // 建物の一覧・棟数も、外した建物を除いて「入れたもの」にそろえる
+  scene.keepBuildings(keep);
+  const keepRoad = scene.solids.roads.map((r) => wide([r]));
+  const roads = scene.solids.roads.filter((_, i) => keepRoad[i]);
+  scene.keepRoads(keepRoad);
   const groups: UnionGroup<'roof' | 'road' | 'ground'>[] = [
     { key: 'roof', solids: buildings.flat().map(resolve) },
     { key: 'road', solids: roads.map(resolve) },
