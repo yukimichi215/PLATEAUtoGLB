@@ -32,11 +32,13 @@ const { values } = parseArgs({
     'fit-mm': { type: 'string' },
     /** 台座の厚さ（mm。0 で台座なし） */
     'base-mm': { type: 'string', default: '3' },
+    /** 建物の高さだけを何倍にするか（1〜3） */
+    'height-scale': { type: 'string', default: '1' },
   },
 });
 
 if (!values.lat || !values.lon) {
-  console.error('使い方: npm run cli -- --lat <緯度> --lon <経度> [--size 300] [--lod 1|2|3] [--installations] [--format glb,obj,stl] [--print [--scale 1000 | --fit-mm 100] [--base-mm 3]] [--name 名前]');
+  console.error('使い方: npm run cli -- --lat <緯度> --lon <経度> [--size 300] [--lod 1|2|3] [--installations] [--format glb,obj,stl] [--print [--scale 1000 | --fit-mm 100] [--base-mm 3]] [--height-scale 1.5] [--name 名前]');
   process.exit(1);
 }
 
@@ -107,6 +109,7 @@ const req = {
   includeRoads: !values['no-roads'],
   includeGround: !values['no-ground'],
   placeName: values.name,
+  heightScale: Number(values['height-scale']),
   print: values.print
     ? values['fit-mm'] !== undefined
       ? { fitSideMm: Number(values['fit-mm']), baseMm: Number(values['base-mm']) }

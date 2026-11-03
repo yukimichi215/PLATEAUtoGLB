@@ -14,6 +14,7 @@ const searchBtn = $<HTMLButtonElement>('search-btn');
 const candidatesEl = $<HTMLUListElement>('candidates');
 const placeEl = $<HTMLParagraphElement>('place');
 const sizeEl = $<HTMLSelectElement>('size');
+const heightScaleEl = $<HTMLSelectElement>('height-scale');
 const roadsEl = $<HTMLInputElement>('roads');
 const printOptionsEl = $<HTMLDivElement>('print-options');
 const printHintEl = $<HTMLParagraphElement>('print-hint');
@@ -177,6 +178,7 @@ function currentRequest(): AreaRequest {
     includeGround: groundEl.checked,
     placeName: selected!.title,
     print: currentPrint(),
+    heightScale: Number(heightScaleEl.value),
   };
 }
 
@@ -249,6 +251,7 @@ makeBtn.addEventListener('click', async () => {
     if (plan.request.includeRoads) addStat('道路', `${s.roads.toLocaleString()} 本`);
     addStat('三角形の数', s.triangles.toLocaleString());
     addStat('ファイルの大きさ', mb(s.glbBytes));
+    if (plan.request.heightScale && plan.request.heightScale !== 1) addStat('高さの強調', `${plan.request.heightScale} 倍`);
     if (s.print) {
       addStat('縮尺', s.print.scaleLabel);
       addStat('印刷したときの大きさ（幅×奥行き×高さ）', `${s.print.widthMm} × ${s.print.depthMm} × ${s.print.heightMm} mm`);
