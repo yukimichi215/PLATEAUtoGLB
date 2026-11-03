@@ -3,7 +3,7 @@ import { areaOfPolygon, MAX_SIZE, meshCodesForArea } from '../core/area.js';
 import { fetchCatalogJson } from '../core/catalog.js';
 import { CoverageIndex, type AreaCoverage } from '../core/coverage.js';
 import type { LatLonBox } from '../core/geo.js';
-import { searchPlace, type Place } from '../core/geocode.js';
+import { isLatLonTitle, searchPlace, type Place } from '../core/geocode.js';
 import type { AreaPlan, AreaRequest, DownloadKind, GenerateStats } from '../core/pipeline.js';
 import type { PrintOptions } from '../core/print.js';
 import { AreaMap, type AreaMode, type DrawState } from './area-map.js';
@@ -30,6 +30,7 @@ const heightScaleEl = $<HTMLSelectElement>('height-scale');
 const roadsEl = $<HTMLInputElement>('roads');
 const printOptionsEl = $<HTMLDivElement>('print-options');
 const printHintEl = $<HTMLParagraphElement>('print-hint');
+const printMoreEl = $<HTMLDetailsElement>('print-more');
 const scaleEl = $<HTMLSelectElement>('scale');
 const fitLabel = $<HTMLLabelElement>('fit-label');
 const fitMmEl = $<HTMLInputElement>('fit-mm');
@@ -155,8 +156,15 @@ function selectPlace(p: Place, situation: Situation | null = null, name: Text | 
 /** 選んだ場所の表示（シチュエーションの候補なら、その言語の名前） */
 function renderPlace(): void {
   if (!selected) return;
+  const lat = selected.lat.toFixed(5);
+  const lon = selected.lon.toFixed(5);
+  // 緯度・経度で探したときは、名前も緯度・経度なので2回出さない
+  if (!selectedName && isLatLonTitle(selected)) {
+    placeEl.textContent = t('place.selectedLatLon', { lat, lon });
+    return;
+  }
   const title = selectedName ? selectedName[lang()] : coreText(selected.title);
-  placeEl.textContent = t('place.selected', { title, lat: selected.lat.toFixed(5), lon: selected.lon.toFixed(5) });
+  placeEl.textContent = t('place.selected', { title, lat, lon });
 }
 
 const currentAreaMode = () =>
@@ -424,6 +432,7 @@ function updatePrintUi(): void {
   const print = isPrint();
   printOptionsEl.hidden = !print;
   printHintEl.hidden = !print;
+  printMoreEl.hidden = !print;
   fitLabel.hidden = scaleEl.value !== 'fit';
   // 3Dプリンタ用では台座が地面の代わりになり、範囲からはみ出した部分は切り落とす
   groundEl.disabled = print;
@@ -438,7 +447,8 @@ function updatePrintUi(): void {
   const side = p.fitSideMm ?? (size * 1000) / p.scaleDenominator!;
   const scale = p.fitSideMm ? t('print.hint.scale', { d: Math.round((size * 1000) / p.fitSideMm) }) : '';
   const sizeKey = draw.mode !== 'square' && draw.polygon ? 'print.hint.sizeArea' : 'print.hint.size';
-  printHintEl.textContent = t(sizeKey, { w: side.toFixed(0), scale }) + t('print.hint.rest');
+  // 詳しい説明（print.hint.rest）は畳んだ「詳しく」に置く
+  printHintEl.textContent = t(sizeKey, { w: side.toFixed(0), scale });
 }
 for (const el of [...document.querySelectorAll('input[name="use"]'), scaleEl, fitMmEl, baseMmEl, sizeEl]) {
   el.addEventListener('input', updatePrintUi);
