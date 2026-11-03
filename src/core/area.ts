@@ -1,6 +1,6 @@
 // 切り出す範囲（正方形の一辺の上下限と、地図で囲んだ多角形）の計算。
 // 画面（地図）でも、作る前の確認（pipeline.ts）でも同じものを使う。重い部品を読み込まないよう、ここは軽く保つ。
-import { LocalProjector, type LatLon } from './geo.js';
+import { LocalProjector, type LatLon, type LatLonBox } from './geo.js';
 import { isSimpleRing } from './geometry.js';
 
 export const MIN_SIZE = 50;
@@ -38,4 +38,11 @@ export function polygonIssue(points: LatLon[]): PolygonIssue | undefined {
   if (!isSimpleRing(localRingOf(points, center))) return 'crossing';
   if (size > MAX_SIZE) return 'tooLarge';
   return undefined;
+}
+
+/** 囲んだ形の緯度経度の範囲（南西・北東） */
+export function polygonBox(points: LatLon[]): LatLonBox {
+  const lats = points.map((p) => p.lat);
+  const lons = points.map((p) => p.lon);
+  return { south: Math.min(...lats), west: Math.min(...lons), north: Math.max(...lats), east: Math.max(...lons) };
 }

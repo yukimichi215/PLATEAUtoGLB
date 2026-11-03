@@ -2,8 +2,8 @@ import { createReadStream } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { checkMesh } from '../scripts/lib/check-mesh.js';
 import type { SourceFile } from '../src/core/catalog.js';
-import { LocalProjector, metersPerDegree, type LatLon } from '../src/core/geo.js';
-import { polygonIssue } from '../src/core/area.js';
+import { LocalProjector, meshCodesForBox, metersPerDegree, type LatLon } from '../src/core/geo.js';
+import { polygonBox, polygonIssue } from '../src/core/area.js';
 import { clipPolygonByRing, isSimpleRing, pointInRing } from '../src/core/geometry.js';
 import { areaOfPolygon, generateFromPlan, validateRequest, type AreaPlan, type AreaRequest, type OpenText } from '../src/core/pipeline.js';
 
@@ -56,6 +56,20 @@ describe('囲んだ範囲の計算', () => {
     expect(polygonIssue(toLatLon([[0, 0], [100, 100], [100, 0], [0, 100]]))).toBe('crossing');
     expect(polygonIssue(toLatLon([[-600, -100], [600, -100], [600, 100], [-600, 100]]))).toBe('tooLarge');
     expect(polygonIssue(toLatLon([[-499, -100], [499, -100], [499, 100], [-499, 100]]))).toBeUndefined();
+  });
+
+  it('囲んだ形では、形の緯度経度の範囲にかかるメッシュだけを取る（正方形の余白の分は取らない）', () => {
+    // 東西に細長い四角（約 630 × 110 m）。メッシュ 53394611 の北の端（35.68333）の少し南
+    const rect = [
+      { lat: 35.6815, lon: 139.764 },
+      { lat: 35.6815, lon: 139.771 },
+      { lat: 35.6825, lon: 139.771 },
+      { lat: 35.6825, lon: 139.764 },
+    ];
+    expect(meshCodesForBox(polygonBox(rect))).toEqual(['53394611']);
+    // ちょうど入る正方形（一辺約 630 m）だと北のメッシュにもかかる
+    const sq = areaOfPolygon(rect);
+    expect(meshCodesForBox(new LocalProjector(sq.center).boxAround(sq.size / 2)).length).toBeGreaterThan(1);
   });
 
   it('多角形を、へこんだ範囲で切り取る（面積が合う）', () => {
