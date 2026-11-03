@@ -11,6 +11,7 @@
    - **屋根の形あり**（LOD2）：屋根の形が入る。少し重い
    - **屋根の形＋付属物**（LOD2）：ベランダ・ひさし・屋上の設備なども入る。重い（データのない地域もある）
    - 道路・地面の板を入れるかどうか
+   - **高さの強調**：建物の高さだけを 1〜3 倍にする（平らな町でも立体感が出る。幅・奥行き・道路・台座の厚さは変えない）
 3. 使いみちを選ぶ
    - **そのまま**：実物の大きさ（メートル）。Blender などの編集ソフト・PlotBlock 向け
    - **3D プリンタ用**：縮尺（1/500〜1/10000、または台座の一辺の長さ〔mm〕）と台座の厚さ（mm。0 で台座なし）を決める。
@@ -83,6 +84,7 @@ npm run dev
 | `npm run cli -- --lat 35.6812 --lon 139.7671 --size 300 --lod 1 --name 東京駅` | コマンドで GLB を作る（`--format glb,obj,stl` で OBJ・STL も。出典の文章はいつも一緒に出す）（`--lod 2 --installations` で付属物、`--lod 3` で窓・扉〔試作〕）（取得したデータは `data/cache/` に保存。1ファイル200MB・合計1000MBを超えると中止） |
 | `npm run app:dev` / `npm run app:build` | Windows アプリ版の起動・ビルド（Rust と Tauri の準備が要る。通常は GitHub の自動ビルドで作る） |
 | `npm run cli -- … --print --scale 1000 --base-mm 3`（または `--fit-mm 100`） | 3D プリンタ用（縮尺・台座・閉じた形）で作る |
+| `npm run cli -- … --height-scale 1.5` | 建物の高さだけを 1.5 倍にする（1〜3） |
 | `npm run verify -- out/xxx.glb out/xxx.obj out/xxx.stl` | GLB を glTF Validator と three.js で、OBJ・STL を three.js の OBJLoader・STLLoader で検査し、外形・三角形の数を表示。STL は印刷できる形か（開いた辺・3つ以上の面が共有する辺・部品の数・体積が正か・台座から浮いた部品）も表示 |
 
 PR を出す前の検証：`npm run typecheck`、`npm test`、`npm run build` がすべて通ること。

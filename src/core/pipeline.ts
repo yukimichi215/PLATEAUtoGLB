@@ -11,6 +11,8 @@ import { SceneBuilder, type BuildingInfo } from './scene.js';
 
 export const MIN_SIZE = 50;
 export const MAX_SIZE = 1000;
+export const MIN_HEIGHT_SCALE = 1;
+export const MAX_HEIGHT_SCALE = 3;
 const UNKNOWN_SIZE_GUESS = 20e6;
 
 export interface AreaRequest {
@@ -30,6 +32,8 @@ export interface AreaRequest {
    * 3Dプリンタ用のときは付属物・窓・扉・地面の板は入れない（台座が地面の代わり）。
    */
   print?: PrintOptions;
+  /** 建物の高さだけを何倍にするか（高さの強調。1〜3。指定しないときは 1）。幅・奥行き・道路・台座の厚さは変えない */
+  heightScale?: number;
 }
 
 export interface AreaPlan {
@@ -51,6 +55,10 @@ export function validateRequest(req: AreaRequest): void {
     throw new Error(`広さは ${MIN_SIZE}〜${MAX_SIZE} m の範囲で指定してください。`);
   }
   if (req.print) validatePrint(req.print);
+  const k = req.heightScale ?? 1;
+  if (!(k >= MIN_HEIGHT_SCALE && k <= MAX_HEIGHT_SCALE)) {
+    throw new Error(`高さの強調は ${MIN_HEIGHT_SCALE}〜${MAX_HEIGHT_SCALE} 倍の範囲で指定してください。`);
+  }
 }
 
 export async function planArea(req: AreaRequest, fetchJson: FetchJson): Promise<AreaPlan> {
@@ -151,6 +159,7 @@ export async function generateFromPlan(
     lod: req.lod,
     installations: !req.print && req.lod >= 2 && req.installations === true,
     solid: req.print !== undefined,
+    heightScale: req.heightScale ?? 1,
   });
   const used: UsedFile[] = [];
 
@@ -206,6 +215,8 @@ export async function generateFromPlan(
         ...(print.droppedFaces > 0 ? [`元データの形がくずれていて閉じた形にできない面 ${print.droppedFaces} 枚を省く`] : []),
       ]
     : [];
+  const heightScale = req.heightScale ?? 1;
+  if (heightScale !== 1) processing.unshift(`建物の高さだけを ${heightScale} 倍に強調する（幅・奥行きは元のまま）`);
   const credit = buildCredit(used, { description, createdAt, processing });
 
   const extras = {
@@ -228,6 +239,7 @@ export async function generateFromPlan(
         sizeMeters: req.size,
         lod: req.lod,
         installations: !req.print && req.lod >= 2 && req.installations === true,
+        heightScale,
         origin: print
           ? '範囲の中心・台座の上面が高さ0。単位はメートル（縮尺をかけた大きさ）、+Y が上、-Z が北'
           : '範囲の中心・地面の高さ0。単位はメートル、+Y が上、-Z が北',
@@ -243,7 +255,7 @@ export async function generateFromPlan(
   const glbParts = print ? scaleParts(scene.parts, print.mmPerMeter / 1000) : scene.parts;
   const meshParts = print ? scaleParts(scene.parts, print.mmPerMeter) : scene.parts;
   const glb = await buildGlb({ parts: glbParts, copyright: credit.short, extras, name: `PLATEAU_${safeFileName(place)}` });
-  const fileName = `plateau_${safeFileName(place)}_${req.size}m_${detailCode(req)}`;
+  const fileName = `plateau_${safeFileName(place)}_${req.size}m_${detailCode(req)}${heightScale !== 1 ? `_h${heightScale}x` : ''}`;
   const obj = toObj(
     meshParts,
     credit.text,

@@ -77,6 +77,8 @@ export interface SceneOptions {
    * 窓・扉・付属物は細かすぎて印刷できないので入れない。
    */
   solid?: boolean;
+  /** 建物の高さだけを何倍にするか（高さの強調。1 でそのまま）。幅・奥行き・道路・台座は変えない */
+  heightScale?: number;
 }
 
 export interface BuildingInfo {
@@ -226,7 +228,7 @@ export class SceneBuilder {
         this.skippedBuildings++;
         return false;
       }
-      this.recordBuilding(b, cx, cz, maxY - minY, useLod3 ? 3 : useLod2 ? 2 : 1, 0);
+      this.recordBuilding(b, cx, cz, (maxY - minY) * this.heightScale, useLod3 ? 3 : useLod2 ? 2 : 1, 0);
       if (useLod3) this.lod3Buildings++;
       return true;
     }
@@ -237,8 +239,8 @@ export class SceneBuilder {
     for (const s of local) {
       // 底の面は見えないので入れない（三角形を減らす）
       if (s.kind === 'ground') continue;
-      for (let i = 1; i < s.exterior.length; i += 3) s.exterior[i]! -= minY;
-      for (const r of s.interiors) for (let i = 1; i < r.length; i += 3) r[i]! -= minY;
+      this.lift(s.exterior, minY);
+      for (const r of s.interiors) this.lift(r, minY);
       const tri = triangulatePolygon(s.exterior, s.interiors);
       if (!tri) continue;
       if (s.kind === 'window' || s.kind === 'door') {
@@ -264,8 +266,8 @@ export class SceneBuilder {
       for (const p of useLod3 ? b.installations3 : b.installations) {
         const ext = this.toLocal(p.exterior);
         const holes = p.interiors.map((r) => this.toLocal(r));
-        for (let i = 1; i < ext.length; i += 3) ext[i]! -= minY;
-        for (const r of holes) for (let i = 1; i < r.length; i += 3) r[i]! -= minY;
+        this.lift(ext, minY);
+        for (const r of holes) this.lift(r, minY);
         const tri = triangulatePolygon(ext, holes);
         if (!tri) continue;
         this.parts.detail.addTriangles(tri.positions, tri.indices, tri.normal);
@@ -275,8 +277,22 @@ export class SceneBuilder {
     }
 
     if (useLod3) this.lod3Buildings++;
-    this.recordBuilding(b, cx, cz, maxY - minY, useLod3 ? 3 : useLod2 ? 2 : 1, installationFaces);
+    this.recordBuilding(b, cx, cz, (maxY - minY) * this.heightScale, useLod3 ? 3 : useLod2 ? 2 : 1, installationFaces);
     return true;
+  }
+
+  private get heightScale(): number {
+    return this.opt.heightScale ?? 1;
+  }
+
+  /**
+   * 建物の多角形（x, 高さ, z の並び）の高さを、建物のいちばん低い点 minY が 0 になるようにずらし、
+   * 高さの強調の倍率をかける（その場で書き換えて、同じ配列を返す）
+   */
+  private lift(ring: number[], minY: number): number[] {
+    const k = this.heightScale;
+    for (let i = 1; i < ring.length; i += 3) ring[i] = (ring[i]! - minY) * k;
+    return ring;
   }
 
   private recordBuilding(b: Building, cx: number, cz: number, height: number, lodUsed: 1 | 2 | 3, installationFaces: number): void {
@@ -320,8 +336,8 @@ export class SceneBuilder {
         if (!tri || Math.abs(tri.normal[1]) < (s.kind === 'roof' ? 0.05 : 0.3)) continue;
         // 範囲からはみ出した部分は、柱にしてから立体として切り落とす（print.ts）。
         // 多角形のまま切ると、へこんだ形で幅 0 の橋ができて閉じた形にならないことがあるため
-        const ext = s.exterior.map((v, i) => (i % 3 === 1 ? v - minY : v));
-        const holes = s.interiors.map((r) => r.map((v, i) => (i % 3 === 1 ? v - minY : v)));
+        const ext = this.lift([...s.exterior], minY);
+        const holes = s.interiors.map((r) => this.lift([...r], minY));
         // 地面の高さにある面（建物の底）は使わない
         let top = -Infinity;
         for (let i = 1; i < ext.length; i += 3) top = Math.max(top, ext[i]!);
