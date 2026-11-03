@@ -13,7 +13,7 @@ export interface GlbInput {
 }
 
 /** 材質の色（sRGB 0〜1）と表示名 */
-const MATERIALS: Record<PartName, { name: string; color: [number, number, number] }> = {
+export const MATERIALS: Record<PartName, { name: string; color: [number, number, number] }> = {
   wall: { name: '建物の壁', color: [0.86, 0.85, 0.82] },
   roof: { name: '建物の屋根', color: [0.62, 0.6, 0.57] },
   detail: { name: '建物の付属物', color: [0.74, 0.73, 0.7] },
@@ -24,13 +24,13 @@ const MATERIALS: Record<PartName, { name: string; color: [number, number, number
 };
 
 /** 部品の名前（GLB の中のノード名・メッシュ名） */
-const GROUPS: { name: string; parts: PartName[] }[] = [
+export const GROUPS: { name: string; parts: PartName[] }[] = [
   { name: 'Buildings', parts: ['wall', 'roof', 'detail', 'window', 'door'] },
   { name: 'Roads', parts: ['road'] },
   { name: 'Ground', parts: ['ground'] },
 ];
 
-function srgbToLinear(c: number): number {
+export function srgbToLinear(c: number): number {
   return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
 }
 

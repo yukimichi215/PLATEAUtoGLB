@@ -76,6 +76,7 @@ export function buildCredit(used: UsedFile[], area: { description: string; creat
   if (used.some((u) => u.file.type === 'tran')) lines.push('・道路は範囲の形に切り取り、平らな板にする');
   lines.push('');
   lines.push('このファイルは、上記のデータをもとに PLATEAUtoGLB で加工して作成したものです。');
+  lines.push('GLB・OBJ・STL のどの形式で使うときも、また 3D プリントした物や画像・映像にして使うときも、この出典を表示してください。');
   lines.push('国土交通省・各自治体が作成したものではありません。');
   lines.push(`利用条件の詳細：${SITE_POLICY_URL}`);
   lines.push(`作成日：${area.createdAt}`);
