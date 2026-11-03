@@ -171,11 +171,11 @@ export const en: Record<MessageKey, string> = {
   'stats.size': 'Size (width × depth × height)',
 
   'footer.data':
-    'Building and road data are processed from the 3D city models of MLIT Project PLATEAU (copyright held by each municipality). This tool is not made by MLIT or any municipality. Address search uses the GSI (Geospatial Information Authority of Japan) address search.',
+    'Building and road data are processed from the 3D city models of MLIT Project PLATEAU (copyright held by each municipality). This tool is not made by MLIT or any municipality. Address search uses the GSI (Geospatial Information Authority of Japan) address search, and the map for choosing the area uses GSI Tiles.',
   'footer.unofficial':
     'This is an unofficial tool made by an individual. It is not affiliated with MLIT, any municipality, or GSI.',
   'footer.privacy':
-    'No personal information is collected (no analytics, ads or third-party tracking). Address searches send what you type to GSI, and making a model sends the area you chose to the PLATEAU data service. Your language choice and downloaded data are stored only on this device.',
+    'No personal information is collected (no analytics, ads or third-party tracking). Address searches send what you type to GSI, showing the map requests the map images for that spot from GSI, and making a model sends the area you chose to the PLATEAU data service. Your language choice and downloaded data are stored only on this device.',
   'footer.warranty': 'Provided without warranty. The author is not responsible for the accuracy of the models or for any result of using them.',
   'footer.licenses': 'Licenses of bundled software',
   'footer.clearCache': 'Delete PLATEAU data saved on this device',
