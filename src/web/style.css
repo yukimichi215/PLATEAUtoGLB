@@ -92,15 +92,19 @@ label.inline { display: flex; flex-direction: row; align-items: center; gap: 6px
 .preview-scale { position: absolute; left: 8px; bottom: 8px; padding: 2px 8px; border-radius: 6px; background: var(--card); color: var(--text); font-size: .8rem; opacity: .85; pointer-events: none; }
 .view-buttons { margin-top: 8px; }
 .situation label { display: flex; flex-direction: column; gap: 4px; }
-.situation-evidence { margin-top: 12px; padding: 8px 12px; border-left: 3px solid var(--muted); }
+.situation-evidence { margin-top: 12px; }
 .situation-evidence h3 { margin: 0 0 4px; font-size: 1rem; }
-.stats { display: grid; grid-template-columns: minmax(0, max-content) minmax(0, 1fr); gap: 2px 16px; margin: 12px 0; }
-.stats dt { color: var(--muted); }
-.stats dd { margin: 0; overflow-wrap: anywhere; }
-/* 狭い画面では、項目名の下に値を置く（横にはみ出さないように） */
+.stats { display: grid; grid-template-columns: minmax(0, max-content) minmax(0, 1fr); margin: 12px 0; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+/* 表のように、行ごとに線を引き、項目名の列に薄い背景を付ける */
+.stats dt, .stats dd { margin: 0; padding: 8px 12px; border-top: 1px solid var(--border); }
+.stats dt:first-of-type, .stats dt:first-of-type + dd { border-top: none; }
+.stats dt { color: var(--muted); background: color-mix(in srgb, var(--border) 30%, var(--card)); border-right: 1px solid var(--border); }
+.stats dd { overflow-wrap: anywhere; }
+/* 狭い画面では、項目名の下に値を置く（横にはみ出さないように）。項目ごとの区切り線は残す */
 @media (max-width: 480px) {
-  .stats { grid-template-columns: minmax(0, 1fr); gap: 0; }
-  .stats dd { margin-bottom: 8px; }
+  .stats { grid-template-columns: minmax(0, 1fr); }
+  .stats dt { border-right: none; padding-bottom: 4px; font-size: .88rem; }
+  .stats dt + dd { border-top: none; padding-top: 4px; }
 }
 pre { white-space: pre-wrap; word-break: break-all; font-size: .85rem; background: var(--bg); padding: 8px; border-radius: 8px; }
 footer { color: var(--muted); font-size: .85rem; padding-bottom: 32px; }
