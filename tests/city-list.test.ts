@@ -1,16 +1,28 @@
 import { describe, expect, it } from 'vitest';
 import listJson from '../src/web/city-list.json';
-import { groupByPref, type CityList } from '../src/web/city-list.js';
+import { groupByPref, PREF_ROMAJI, type CityList } from '../src/web/city-list.js';
 import { meshBox, meshCode3 } from '../src/core/geo.js';
 
 const list = listJson as CityList;
 
 describe('対応地域の一覧', () => {
-  it('自治体の数が、データカタログの数（cityCount）と一致し、重複がない', () => {
+  it('一覧の自治体の数＋外した自治体の数が、データカタログの自治体の数と一致し、重複がない', () => {
     expect(list.cities).toHaveLength(list.cityCount);
-    expect(new Set(list.cities.map((c) => c.code)).size).toBe(list.cityCount);
+    expect(list.cityCount + list.excluded.length).toBe(list.catalogCityCount);
+    const codes = [...list.cities.map((c) => c.code), ...list.excluded.map((e) => e.code)];
+    expect(new Set(codes).size).toBe(list.catalogCityCount);
     // 2026-11 時点のデータカタログでは 306 自治体。大きく減っていたら作り方の誤りを疑う
     expect(list.cityCount).toBeGreaterThan(250);
+  });
+
+  it('CityGML のない自治体（岐阜市など）は一覧に入れない', () => {
+    expect(list.cities.some((c) => c.code === '21201')).toBe(false);
+    expect(list.excluded.some((e) => e.code === '21201')).toBe(true);
+  });
+
+  it('都道府県のローマ字が、一覧のすべての都道府県にある', () => {
+    for (const c of list.cities) expect(PREF_ROMAJI[c.prefCode], c.pref).toBeTruthy();
+    expect(PREF_ROMAJI['13']).toBe('Tokyo');
   });
 
   it('都道府県ごとにまとめても、数は変わらない（すべての自治体がどこかの都道府県に入る）', () => {

@@ -1,8 +1,8 @@
 // 対応地域の一覧から探す：都道府県ごとに畳んだ一覧と、LOD2・LOD3 での絞り込み。
 // 自治体名・都道府県名は日本語の原文のまま出す（英語の画面でも同じ）。
 import listJson from './city-list.json';
-import { groupByPref, type CityEntry, type CityList, type Lod3Place, type LodFilter } from './city-list.js';
-import { t } from './i18n/index.js';
+import { groupByPref, PREF_ROMAJI, type CityEntry, type CityList, type Lod3Place, type LodFilter } from './city-list.js';
+import { lang, t } from './i18n/index.js';
 
 export const CITY_LIST = listJson as CityList;
 
@@ -48,7 +48,9 @@ export class CityListView {
       d.open = this.open.has(g.prefCode);
       d.addEventListener('toggle', () => (d.open ? this.open.add(g.prefCode) : this.open.delete(g.prefCode)));
       const s = document.createElement('summary');
-      s.textContent = t('cities.pref', { pref: g.pref, n: g.cities.length });
+      // 英語の画面では、日本語の都道府県名にローマ字を添える（例：東京都 Tokyo）
+      const pref = lang() === 'en' && PREF_ROMAJI[g.prefCode] ? `${g.pref} ${PREF_ROMAJI[g.prefCode]}` : g.pref;
+      s.textContent = t('cities.pref', { pref, n: g.cities.length });
       const ul = document.createElement('ul');
       ul.className = 'city-items';
       for (const c of g.cities) ul.appendChild(this.cityItem(c));

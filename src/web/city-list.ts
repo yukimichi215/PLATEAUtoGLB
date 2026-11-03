@@ -30,8 +30,12 @@ export interface CityEntry {
 export interface CityList {
   source: string;
   createdAt: string;
-  /** データセット一覧の自治体の数（cities の数と一致する） */
+  /** データカタログのデータセット一覧で、建物モデルがある自治体の数（3D 表示用だけのものも含む） */
+  catalogCityCount: number;
+  /** 一覧に入れた自治体の数（cities の数。catalogCityCount から excluded を除いた数） */
   cityCount: number;
+  /** CityGML の建物がなく、このツールでは作れないので外した自治体 */
+  excluded: { code: string; name: string }[];
   cities: CityEntry[];
 }
 
@@ -56,3 +60,54 @@ export function groupByPref(cities: CityEntry[], filter: LodFilter): PrefGroup[]
     .sort((a, b) => a.prefCode.localeCompare(b.prefCode))
     .map((g) => ({ ...g, cities: g.cities.sort((a, b) => a.code.localeCompare(b.code)) }));
 }
+
+/** 都道府県名のローマ字（英語の画面で、日本語の名前に添える）。都道府県コード → 名前 */
+export const PREF_ROMAJI: Record<string, string> = {
+  '01': 'Hokkaido',
+  '02': 'Aomori',
+  '03': 'Iwate',
+  '04': 'Miyagi',
+  '05': 'Akita',
+  '06': 'Yamagata',
+  '07': 'Fukushima',
+  '08': 'Ibaraki',
+  '09': 'Tochigi',
+  '10': 'Gunma',
+  '11': 'Saitama',
+  '12': 'Chiba',
+  '13': 'Tokyo',
+  '14': 'Kanagawa',
+  '15': 'Niigata',
+  '16': 'Toyama',
+  '17': 'Ishikawa',
+  '18': 'Fukui',
+  '19': 'Yamanashi',
+  '20': 'Nagano',
+  '21': 'Gifu',
+  '22': 'Shizuoka',
+  '23': 'Aichi',
+  '24': 'Mie',
+  '25': 'Shiga',
+  '26': 'Kyoto',
+  '27': 'Osaka',
+  '28': 'Hyogo',
+  '29': 'Nara',
+  '30': 'Wakayama',
+  '31': 'Tottori',
+  '32': 'Shimane',
+  '33': 'Okayama',
+  '34': 'Hiroshima',
+  '35': 'Yamaguchi',
+  '36': 'Tokushima',
+  '37': 'Kagawa',
+  '38': 'Ehime',
+  '39': 'Kochi',
+  '40': 'Fukuoka',
+  '41': 'Saga',
+  '42': 'Nagasaki',
+  '43': 'Kumamoto',
+  '44': 'Oita',
+  '45': 'Miyazaki',
+  '46': 'Kagoshima',
+  '47': 'Okinawa',
+};
