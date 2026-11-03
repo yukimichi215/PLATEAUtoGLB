@@ -17,9 +17,9 @@ const fetchJson: typeof defaultFetchJson = async (url) => {
 };
 
 for (const s of SITUATIONS) {
-  console.log(`## ${s.label}`);
+  console.log(`## ${s.label.ja}`);
   for (const p of s.places) {
-    const query = p.name.replace(/（.*）/, '').replace(/ .*/, '');
+    const query = p.name.ja.replace(/（.*）/, '').replace(/ .*/, '');
     let geo = '';
     try {
       const found = await searchPlace(query, fetchJson);
@@ -33,9 +33,9 @@ for (const s of SITUATIONS) {
       const plan = await planArea({ center: p, size: 300, lod: 1, includeRoads: false, includeGround: true }, fetchJson);
       const bldg = plan.files.filter((f) => f.type === 'bldg');
       const cities = [...new Set(bldg.flatMap((f) => f.cities.map((c) => `${c.name}${c.year}`)))].join('/');
-      console.log(`- ${p.name}: 建物ファイル ${bldg.length} 件 ${(plan.totalBytes / 1e6).toFixed(0)} MB ${cities} ／ ${geo}`);
+      console.log(`- ${p.name.ja}: 建物ファイル ${bldg.length} 件 ${(plan.totalBytes / 1e6).toFixed(0)} MB ${cities} ／ ${geo}`);
     } catch (e) {
-      console.log(`- ${p.name}: カタログ エラー ${e instanceof Error ? e.message : e} ／ ${geo}`);
+      console.log(`- ${p.name.ja}: カタログ エラー ${e instanceof Error ? e.message : e} ／ ${geo}`);
     }
   }
 }

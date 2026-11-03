@@ -10,11 +10,6 @@ export interface DonateLink {
   url: string;
 }
 
-const LABELS: Record<DonateService, { ja: string; en: string }> = {
-  ofuse: { ja: 'OFUSE で応援', en: 'Support on OFUSE' },
-  githubSponsors: { ja: 'GitHub Sponsors で応援', en: 'Sponsor on GitHub' },
-};
-
 /** 使う URL か（https のみ。空や別の形式は使わない） */
 function usable(url: string): boolean {
   try {
@@ -28,12 +23,10 @@ function usable(url: string): boolean {
  * 表示するボタンの一覧。URL が空・不正なものは出さない。
  * 日本語の画面では OFUSE を先に、英語の画面では GitHub Sponsors を先に並べる。
  */
-export function donateLinks(cfg: DonateConfig, lang: string): DonateLink[] {
+export function donateLinks(cfg: DonateConfig, lang: string, labelOf: (s: DonateService) => string): DonateLink[] {
   const en = lang.toLowerCase().startsWith('en');
   const order: DonateService[] = en ? ['githubSponsors', 'ofuse'] : ['ofuse', 'githubSponsors'];
-  return order
-    .filter((s) => usable(cfg[s]))
-    .map((s) => ({ service: s, label: en ? LABELS[s].en : LABELS[s].ja, url: cfg[s].trim() }));
+  return order.filter((s) => usable(cfg[s])).map((s) => ({ service: s, label: labelOf(s), url: cfg[s].trim() }));
 }
 
 // 絵はアプリに同梱する自作のもの（各サービスのロゴは使わない）。ハート：Sponsors、封筒とハート：OFUSE（ファンレター）

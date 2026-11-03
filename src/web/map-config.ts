@@ -5,7 +5,8 @@
 // ・ズーム 5〜8 は海岸線などに別の出典（VMAP0 など）が要るので、9 以上だけを使う。
 export const MAP_TILES = {
   url: 'https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png',
-  attribution: '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank" rel="noopener noreferrer">地理院タイル</a>',
+  /** 出典のリンク先（表示する文字は辞書の map.attribution。「地理院タイル」） */
+  attributionUrl: 'https://maps.gsi.go.jp/development/ichiran.html',
   minZoom: 9,
   maxZoom: 18,
 } as const;

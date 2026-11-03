@@ -14,6 +14,7 @@ import {
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { formatLength, niceGridStep } from './grid-scale.js';
+import { t } from './i18n/index.js';
 
 /** 視点：斜めから（南東の上から見下ろす）・真上から・正面から（南から） */
 export type ViewName = 'angle' | 'top' | 'front';
@@ -32,6 +33,9 @@ export class Preview {
   private grid: GridHelper | null = null;
   private readonly gridLabel: HTMLElement;
   private readonly box = new Box3();
+  /** マス目の1マスの長さ（m）と、3Dプリンタ用か（言語を変えたときに書き直すため） */
+  private gridStep = 0;
+  private gridPrint = false;
   private readonly observer: ResizeObserver;
 
   constructor(private readonly container: HTMLElement) {
@@ -103,7 +107,16 @@ export class Preview {
     // 模型の底のすぐ下に置く（底の面とちらつかないように少しだけ下げる）
     this.grid.position.set(center.x, this.box.min.y - extent * 1e-3, center.z);
     this.scene.add(this.grid);
-    this.gridLabel.textContent = `マス目 1 つ = ${formatLength(step, print)}${print ? '（印刷したときの大きさ）' : ''}`;
+    this.gridStep = step;
+    this.gridPrint = print;
+    this.relabel();
+  }
+
+  /** マス目の長さの文を、今の画面の言語で書き直す */
+  relabel(): void {
+    if (this.gridStep === 0) return;
+    const length = formatLength(this.gridStep, this.gridPrint);
+    this.gridLabel.textContent = t(this.gridPrint ? 'preview.gridPrint' : 'preview.grid', { length });
   }
 
   private resize(): void {
