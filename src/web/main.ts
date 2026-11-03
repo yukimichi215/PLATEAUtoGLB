@@ -1,6 +1,7 @@
 // 画面の操作。重い処理は worker.ts に任せる。
 import { searchPlace, type Place } from '../core/geocode.js';
 import type { AreaPlan, AreaRequest, DownloadFile, DownloadKind } from '../core/pipeline.js';
+import type { PrintOptions } from '../core/print.js';
 import { isDesktop, saveWithDialog } from './desktop.js';
 import { Preview } from './preview.js';
 import type { WorkerRequest, WorkerResponse } from './worker.js';
@@ -14,6 +15,13 @@ const candidatesEl = $<HTMLUListElement>('candidates');
 const placeEl = $<HTMLParagraphElement>('place');
 const sizeEl = $<HTMLSelectElement>('size');
 const roadsEl = $<HTMLInputElement>('roads');
+const printOptionsEl = $<HTMLDivElement>('print-options');
+const printHintEl = $<HTMLParagraphElement>('print-hint');
+const scaleEl = $<HTMLSelectElement>('scale');
+const fitLabel = $<HTMLLabelElement>('fit-label');
+const fitMmEl = $<HTMLInputElement>('fit-mm');
+const baseMmEl = $<HTMLInputElement>('base-mm');
+const overhangHint = $<HTMLSpanElement>('overhang-hint');
 const groundEl = $<HTMLInputElement>('ground');
 const makeBtn = $<HTMLButtonElement>('make-btn');
 const progressEl = $<HTMLDivElement>('progress');
@@ -123,6 +131,41 @@ searchForm.addEventListener('submit', async (ev) => {
   }
 });
 
+const isPrint = () => document.querySelector<HTMLInputElement>('input[name="use"]:checked')?.value === 'print';
+
+function currentPrint(): PrintOptions | undefined {
+  if (!isPrint()) return undefined;
+  const baseMm = Number(baseMmEl.value);
+  return scaleEl.value === 'fit'
+    ? { fitSideMm: Number(fitMmEl.value), baseMm }
+    : { scaleDenominator: Number(scaleEl.value), baseMm };
+}
+
+/** 3Dプリンタ用の設定の表示と、印刷したときの大きさの目安 */
+function updatePrintUi(): void {
+  const print = isPrint();
+  printOptionsEl.hidden = !print;
+  printHintEl.hidden = !print;
+  fitLabel.hidden = scaleEl.value !== 'fit';
+  // 3Dプリンタ用では台座が地面の代わりになり、範囲からはみ出した部分は切り落とす
+  groundEl.disabled = print;
+  overhangHint.hidden = print;
+  if (!print) return;
+  const size = Number(sizeEl.value);
+  const p = currentPrint()!;
+  const side = p.fitSideMm ?? (size * 1000) / p.scaleDenominator!;
+  const scale = p.fitSideMm ? `（縮尺 約 1/${Math.round((size * 1000) / p.fitSideMm)}）` : '';
+  printHintEl.textContent =
+    `印刷したときの台座の大きさ：約 ${side.toFixed(0)} × ${side.toFixed(0)} mm${scale}。` +
+    'OBJ・STL はミリメートル、STL は印刷ソフトに合わせて上が +Z です。' +
+    '建物は屋根の面を真下に押し出した、穴のない形に作り直します（付属物・窓は入れず、範囲からはみ出した部分は切り落とします。台座が地面の代わりになります）。';
+}
+for (const el of [...document.querySelectorAll('input[name="use"]'), scaleEl, fitMmEl, baseMmEl, sizeEl]) {
+  el.addEventListener('input', updatePrintUi);
+  el.addEventListener('change', updatePrintUi);
+}
+updatePrintUi();
+
 function currentRequest(): AreaRequest {
   const detail = document.querySelector<HTMLInputElement>('input[name="detail"]:checked')?.value ?? 'box';
   return {
@@ -133,6 +176,7 @@ function currentRequest(): AreaRequest {
     includeRoads: roadsEl.checked,
     includeGround: groundEl.checked,
     placeName: selected!.title,
+    print: currentPrint(),
   };
 }
 
@@ -205,7 +249,16 @@ makeBtn.addEventListener('click', async () => {
     if (plan.request.includeRoads) addStat('道路', `${s.roads.toLocaleString()} 本`);
     addStat('三角形の数', s.triangles.toLocaleString());
     addStat('ファイルの大きさ', mb(s.glbBytes));
-    addStat('外形（幅×奥行き×高さ）', `${s.width} × ${s.depth} × ${s.height} m`);
+    if (s.print) {
+      addStat('縮尺', s.print.scaleLabel);
+      addStat('印刷したときの大きさ（幅×奥行き×高さ）', `${s.print.widthMm} × ${s.print.depthMm} × ${s.print.heightMm} mm`);
+      addStat('台座の厚さ', s.print.baseMm > 0 ? `${s.print.baseMm} mm` : 'なし');
+      if (s.print.droppedFaces > 0) {
+        addStat('形がくずれていて入れられなかった面', `${s.print.droppedFaces} 枚（屋根の一部・道路）`);
+      }
+    } else {
+      addStat('外形（幅×奥行き×高さ）', `${s.width} × ${s.depth} × ${s.height} m`);
+    }
     resultEl.hidden = false;
     preview ??= new Preview($('preview'));
     await preview.show(res.glb);

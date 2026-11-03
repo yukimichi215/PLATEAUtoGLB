@@ -1,6 +1,6 @@
 // GLB 以外の形式（OBJ・STL）での書き出しと、出典の文章と一緒に1つにまとめる zip。
 // OBJ・STL はファイルの中に出典を書ききれない（STL はほぼ書けない）ので、必ずクレジットの文章ファイルと一緒に zip で出す。
-import { GROUPS, MATERIALS } from './glb.js';
+import { GROUPS, MATERIALS, srgbToLinear } from './glb.js';
 import type { MeshPart, PartName } from './scene.js';
 
 /** OBJ の材質名（.mtl の中の名前。どのソフトでも読めるよう英字にする） */
@@ -22,9 +22,9 @@ function comment(text: string): string {
     .join('\n');
 }
 
-/** 小数を短く書く（0.1mm 未満は丸める。メートルで小数第4位） */
+/** 小数を短く書く（小数第6位まで。メートルなら 0.001 mm、ミリメートルなら 0.000001 mm） */
 function num(v: number): string {
-  const r = Math.round(v * 1e4) / 1e4;
+  const r = Math.round(v * 1e6) / 1e6;
   return Object.is(r, -0) ? '0' : String(r);
 }
 
@@ -33,10 +33,15 @@ function num(v: number): string {
  * 部品は GLB と同じ名前（Buildings・Roads・Ground）の `o` に分け、材質は .mtl で色を付ける。
  * 同じ位置の頂点は1つにまとめる（Blender などで形がつながって見えるように）。
  */
-export function toObj(parts: Record<PartName, MeshPart>, credit: string, mtlFileName: string): string {
+export function toObj(
+  parts: Record<PartName, MeshPart>,
+  credit: string,
+  mtlFileName: string,
+  unitNote = '単位：メートル。+Y が上、-Z が北。範囲の中心が原点、地面が高さ 0',
+): string {
   const out: string[] = [];
   out.push(comment(credit));
-  out.push('# 単位：メートル。+Y が上、-Z が北。範囲の中心が原点、地面が高さ 0');
+  out.push(`# ${unitNote}`);
   out.push(`mtllib ${mtlFileName}`);
   const ids = new Map<string, number>();
   const vertexLines: string[] = [];
@@ -62,9 +67,8 @@ export function toObj(parts: Record<PartName, MeshPart>, credit: string, mtlFile
       }
       const idx = part.indices;
       for (let t = 0; t < idx.length; t += 3) {
-        const a = local[idx[t]!]!, b = local[idx[t + 1]!]!, c = local[idx[t + 2]!]!;
-        if (a === b || b === c || a === c) continue; // 丸めでつぶれた三角形
-        faceLines.push(`f ${a} ${b} ${c}`);
+        // 丸めで頂点が重なった（面積ほぼ 0 の）三角形も、三角形の数を GLB・STL とそろえるため残す
+        faceLines.push(`f ${local[idx[t]!]!} ${local[idx[t + 1]!]!} ${local[idx[t + 2]!]!}`);
       }
     }
   }
@@ -80,7 +84,8 @@ export function toMtl(parts: Record<PartName, MeshPart>, credit: string): string
       if (parts[partName].triangleCount === 0) continue;
       const m = MATERIALS[partName];
       out.push('', `# ${m.name}`, `newmtl ${MTL_IDS[partName]}`);
-      out.push(`Kd ${m.color.map((c) => c.toFixed(3)).join(' ')}`);
+      // GLB の色と同じ見え方にするため、glTF と同じく直線の色の値（linear）で書く
+      out.push(`Kd ${m.color.map((c) => srgbToLinear(c).toFixed(4)).join(' ')}`);
       out.push('Ka 0 0 0', 'Ks 0 0 0', 'd 1', 'illum 1');
     }
   }
@@ -89,10 +94,11 @@ export function toMtl(parts: Record<PartName, MeshPart>, credit: string): string
 
 /**
  * バイナリ形式の STL にする。単位・向きは GLB と同じ（メートル、+Y が上）。
+ * zUp のときは、3Dプリンタ用の印刷ソフトの標準に合わせて +Z を上（+Y が北）にする（回転なので形・表裏は変わらない）。
  * STL には色がないので、すべての部品を1つの形にまとめる。
  * 先頭の 80 バイト（英数字のみ）に、出典が別のファイルにあることを書く。
  */
-export function toStl(parts: Record<PartName, MeshPart>, header: string): Uint8Array {
+export function toStl(parts: Record<PartName, MeshPart>, header: string, zUp = false): Uint8Array {
   let count = 0;
   for (const part of Object.values(parts)) count += part.triangleCount;
   const buf = new ArrayBuffer(84 + count * 50);
@@ -117,22 +123,45 @@ export function toStl(parts: Record<PartName, MeshPart>, header: string): Uint8A
         let nz = e1[0]! * e2[1]! - e1[1]! * e2[0]!;
         const len = Math.hypot(nx, ny, nz) || 1;
         nx /= len; ny /= len; nz /= len;
-        for (const v of [nx, ny, nz]) {
-          view.setFloat32(o, v, true);
-          o += 4;
-        }
-        for (const v of [a, b, c]) {
-          view.setFloat32(o, p[v]!, true);
-          view.setFloat32(o + 4, p[v + 1]!, true);
-          view.setFloat32(o + 8, p[v + 2]!, true);
+        // +Y が上 → +Z が上：(x, y, z) → (x, -z, y)
+        const put = (x: number, y: number, z: number) => {
+          view.setFloat32(o, x, true);
+          view.setFloat32(o + 4, zUp ? -z : y, true);
+          view.setFloat32(o + 8, zUp ? y : z, true);
           o += 12;
-        }
+        };
+        put(nx, ny, nz);
+        for (const v of [a, b, c]) put(p[v]!, p[v + 1]!, p[v + 2]!);
         view.setUint16(o, 0, true);
         o += 2;
       }
     }
   }
   return bytes;
+}
+
+export type ModelFormat = 'glb' | 'obj' | 'stl';
+export const MODEL_FORMATS: ModelFormat[] = ['glb', 'obj', 'stl'];
+
+/** 「glb,obj」のような書き方を形式の一覧にする（空・重複は除く。知らない形式はエラー） */
+export function parseFormats(text: string): ModelFormat[] {
+  const out: ModelFormat[] = [];
+  for (const raw of text.split(',')) {
+    const f = raw.trim().toLowerCase();
+    if (f === '') continue;
+    if (!MODEL_FORMATS.includes(f as ModelFormat)) throw new Error(`形式 ${f} には対応していません（${MODEL_FORMATS.join(', ')}）`);
+    if (!out.includes(f as ModelFormat)) out.push(f as ModelFormat);
+  }
+  if (out.length === 0) throw new Error(`形式を1つ以上指定してください（${MODEL_FORMATS.join(', ')}）`);
+  return out;
+}
+
+/** STL の先頭（80バイト・英数字のみ）に書く文。出典の全文は、一緒に出すクレジットの文章ファイルにある */
+export function stlHeader(creditFileName: string): string {
+  const base = 'PLATEAU (MLIT Japan), modified. Credit: ';
+  return /^[\x20-\x7e]*$/.test(creditFileName) && base.length + creditFileName.length <= 80
+    ? base + creditFileName
+    : base + '*_credit.txt';
 }
 
 // ---- zip（圧縮なしでまとめるだけ。依存を増やさないため自前で書く） ----

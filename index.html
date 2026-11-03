@@ -54,7 +54,32 @@
           下ほど細かく、ファイルが大きくなります。スマホ向けには「箱型」がおすすめです。
           付属物はベランダ・ひさし・屋上の設備などで、データのない地域もあります。
         </p>
-        <p class="hint">中心が範囲の中にある建物を入れます。大きな建物は範囲から少しはみ出すことがあります。地形（坂や高低差）はまだ入りません。</p>
+        <fieldset class="use">
+          <legend>使いみち</legend>
+          <label class="inline"><input type="radio" name="use" value="model" checked /> そのまま（実物の大きさ。編集ソフト・PlotBlock 向け）</label>
+          <label class="inline"><input type="radio" name="use" value="print" /> 3D プリンタ用（縮尺・台座・印刷できる閉じた形）</label>
+        </fieldset>
+        <div id="print-options" class="grid print-options" hidden>
+          <label>縮尺
+            <select id="scale">
+              <option value="500">1/500</option>
+              <option value="1000" selected>1/1000</option>
+              <option value="2000">1/2000</option>
+              <option value="2500">1/2500</option>
+              <option value="5000">1/5000</option>
+              <option value="10000">1/10000</option>
+              <option value="fit">台座の一辺の長さで決める</option>
+            </select>
+          </label>
+          <label id="fit-label" hidden>台座の一辺の長さ（mm）
+            <input id="fit-mm" type="number" min="10" max="2000" step="1" value="100" />
+          </label>
+          <label>台座の厚さ（mm。0 で台座なし）
+            <input id="base-mm" type="number" min="0" max="50" step="0.5" value="3" />
+          </label>
+        </div>
+        <p id="print-hint" class="hint" hidden></p>
+        <p class="hint">中心が範囲の中にある建物を入れます。<span id="overhang-hint">大きな建物は範囲から少しはみ出すことがあります。</span>地形（坂や高低差）はまだ入りません。</p>
       </section>
 
       <section class="card" aria-labelledby="h-make">
@@ -81,7 +106,8 @@
         </div>
         <p class="hint">
           GLB：色付き・1ファイル（PlotBlock・Web 向け）。OBJ：色付き（Blender などの編集ソフト向け）。STL：色なし（3D プリンタ向け）。
-          OBJ・STL・まとめて保存は、出典の文章ファイルと一緒に zip で保存します。単位はメートル、上は +Y です。
+          OBJ・STL・まとめて保存は、出典の文章ファイルと一緒に zip で保存します。
+          3D プリンタで印刷するときは、手順 2 の「使いみち」で「3D プリンタ用」を選んでから作ってください。
         </p>
         <details>
           <summary>クレジットの文章（作ったものを使うときは、この出典を表示してください）</summary>

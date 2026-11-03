@@ -24,7 +24,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self' blob: data: ipc: http://ipc.localhost https://api.plateauview.mlit.go.jp https://assets.cms.plateau.reearth.io https://msearch.gsi.go.jp; worker-src 'self' blob:; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'"
+      "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; connect-src 'self' blob: data: ipc: http://ipc.localhost https://api.plateauview.mlit.go.jp https://assets.cms.plateau.reearth.io https://msearch.gsi.go.jp; worker-src 'self' blob:; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'"
     }
   },
   "bundle": {

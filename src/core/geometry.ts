@@ -101,35 +101,38 @@ export function triangulatePolygon(exterior: number[], interiors: number[][] = [
  * （Sutherland–Hodgman 法。範囲が四角なので、どんな形の多角形にも使える）。
  */
 export function clipRingToSquare(ring: number[], half: number): number[] {
+  return clipRing(ring, half, 2, 0, 1);
+}
+
+function clipRing(ring: number[], half: number, stride: number, ax: number, az: number): number[] {
   let pts = ring;
   const edges: [number, number, number][] = [
-    // [軸（0=x, 1=z）, 境界の値, 向き（+1 なら 値 <= 境界 が内側）]
-    [0, half, 1],
-    [0, -half, -1],
-    [1, half, 1],
-    [1, -half, -1],
+    // [軸, 境界の値, 向き（+1 なら 値 <= 境界 が内側）]
+    [ax, half, 1],
+    [ax, -half, -1],
+    [az, half, 1],
+    [az, -half, -1],
   ];
   for (const [axis, bound, dir] of edges) {
-    if (pts.length < 6) return [];
+    if (pts.length < stride * 3) return [];
     const out: number[] = [];
-    const n = pts.length / 2;
-    const inside = (i: number) => dir * (pts[i * 2 + axis]! - bound) <= 0;
+    const n = pts.length / stride;
+    const inside = (i: number) => dir * (pts[i * stride + axis]! - bound) <= 0;
     for (let i = 0; i < n; i++) {
       const j = (i + 1) % n;
       const iIn = inside(i);
       const jIn = inside(j);
-      if (iIn) out.push(pts[i * 2]!, pts[i * 2 + 1]!);
+      if (iIn) for (let k = 0; k < stride; k++) out.push(pts[i * stride + k]!);
       if (iIn !== jIn) {
-        const a = pts[i * 2 + axis]!;
-        const b = pts[j * 2 + axis]!;
+        const a = pts[i * stride + axis]!;
+        const b = pts[j * stride + axis]!;
         const t = (bound - a) / (b - a);
-        out.push(
-          pts[i * 2]! + t * (pts[j * 2]! - pts[i * 2]!),
-          pts[i * 2 + 1]! + t * (pts[j * 2 + 1]! - pts[i * 2 + 1]!),
-        );
+        for (let k = 0; k < stride; k++) {
+          out.push(k === axis ? bound : pts[i * stride + k]! + t * (pts[j * stride + k]! - pts[i * stride + k]!));
+        }
       }
     }
     pts = out;
   }
-  return pts.length >= 6 ? pts : [];
+  return pts.length >= stride * 3 ? pts : [];
 }

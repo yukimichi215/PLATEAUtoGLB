@@ -19,6 +19,7 @@
     "@gltf-transform/core": "^4.5.1",
     "@tauri-apps/api": "2.11.1",
     "earcut": "^3.2.4",
+    "manifold-3d": "3.5.4",
     "sax": "^1.6.1",
     "three": "^0.186.1"
   },
