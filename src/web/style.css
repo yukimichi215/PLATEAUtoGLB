@@ -11,8 +11,10 @@
   /* 操作できる部品（ボタン・ドロップダウン・入力欄・選択肢・畳む欄の見出し）は、背景に溶け込まないよう
      背景と違う色と、はっきりした枠線にそろえる。入力欄・選択肢は白、ボタンは薄い灰色 */
   --control-bg: #ffffff;
-  --control-border: #8a94a1;
+  --control-border: #6f7a87;
   --button-bg: #eaeef3;
+  /* 畳む欄の中の背景。中の白い部品と差がつくよう、ページの背景より少し濃くする */
+  --panel-bg: #eceff3;
   /* 選択中（選んだ選択肢・候補）の背景。ライト・ダークで同じくらい目立つように濃さを分ける */
   --selected-bg: color-mix(in srgb, var(--accent) 14%, var(--card));
   color-scheme: light dark;
@@ -31,6 +33,7 @@
     --control-bg: #2a3038;
     --control-border: #7c8795;
     --button-bg: #323a44;
+    --panel-bg: #14171b;
     --selected-bg: color-mix(in srgb, var(--accent) 28%, var(--card));
   }
 }
@@ -174,7 +177,7 @@ footer { color: var(--muted); font-size: .85rem; padding-bottom: 32px; }
 /* 畳んだ枠（ほかの探し方・詳しい設定） */
 /* 中の一覧が広くても、画面からはみ出さないように（minmax(0, 1fr)・min-width: 0） */
 .other-ways { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
-details.panel { border: 1px solid var(--control-border); border-radius: 10px; background: var(--bg); min-width: 0; overflow: hidden; }
+details.panel { border: 1px solid var(--control-border); border-radius: 10px; background: var(--panel-bg); min-width: 0; overflow: hidden; }
 details.panel > summary { cursor: pointer; padding: 12px 14px; list-style: none; background: var(--button-bg); }
 details.panel > summary:hover, .city-groups details.pref > summary:hover { background: color-mix(in srgb, var(--accent) 12%, var(--button-bg)); }
 details.panel > summary::-webkit-details-marker { display: none; }
@@ -185,6 +188,8 @@ details.panel[open] > summary .summary-title::before { content: '▾'; }
 details.panel[open] > summary { border-bottom: 1px solid var(--border); }
 .summary-title { font-weight: 600; }
 .summary-sub { color: var(--muted); font-size: .85rem; }
+/* 灰色の畳む欄の中では、ボタンも白（入力欄と同じ）にして、周りの灰色と差をつける */
+.panel-body { --button-bg: var(--control-bg); }
 .panel-body { padding: 14px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
 .panel-body > * { margin: 0; }
 
