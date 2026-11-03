@@ -5,9 +5,9 @@ import { readCityGml } from './citygml.js';
 import { buildCredit, LICENSE_TEXT, type UsedFile } from './credit.js';
 import { LocalProjector, meshCodesForBox, type LatLon } from './geo.js';
 import { makeZip, stlHeader, toMtl, toObj, toStl } from './export.js';
-import { buildGlb } from './glb.js';
-import { finishForPrint, ROAD_PRINT_MM, scaleParts, validatePrint, type PrintInfo, type PrintOptions } from './print.js';
-import { SceneBuilder, type BuildingInfo } from './scene.js';
+import { buildGlb, GROUPS } from './glb.js';
+import { finishForPrint, ROAD_PRINT_MM, scalePieces, validatePrint, type PrintInfo, type PrintOptions } from './print.js';
+import { SceneBuilder, type BuildingInfo, type MeshPart, type ModelPiece } from './scene.js';
 
 export const MIN_SIZE = 50;
 export const MAX_SIZE = 1000;
@@ -34,6 +34,11 @@ export interface AreaRequest {
   print?: PrintOptions;
   /** 建物の高さだけを何倍にするか（高さの強調。1〜3。指定しないときは 1）。幅・奥行き・道路・台座の厚さは変えない */
   heightScale?: number;
+  /**
+   * 建物を1棟ずつ別の部品にする（GLB のノード・OBJ の o を建物ごとに分け、編集ソフトで1棟ずつ選べるようにする）。
+   * 3Dプリンタ用は1つの立体にまとめるので使わない（指定しても無視する）
+   */
+  separateBuildings?: boolean;
 }
 
 export interface AreaPlan {
@@ -162,6 +167,7 @@ export async function generateFromPlan(
     installations: !req.print && req.lod >= 2 && req.installations === true,
     solid: req.print !== undefined,
     heightScale: req.heightScale ?? 1,
+    separate: separateOf(req),
   });
   const used: UsedFile[] = [];
 
@@ -245,6 +251,7 @@ export async function generateFromPlan(
         lod: req.lod,
         installations: !req.print && req.lod >= 2 && req.installations === true,
         heightScale,
+        separateBuildings: separateOf(req),
         origin: print
           ? '範囲の中心・台座の上面が高さ0。単位はメートル（縮尺をかけた大きさ）、+Y が上、-Z が北'
           : '範囲の中心・地面の高さ0。単位はメートル、+Y が上、-Z が北',
@@ -257,24 +264,25 @@ export async function generateFromPlan(
   };
 
   // 3Dプリンタ用：GLB はメートル（glTF の決まり）で縮尺をかけた大きさ、OBJ・STL はミリメートル（印刷ソフトの標準）
-  const glbParts = print ? scaleParts(scene.parts, print.mmPerMeter / 1000) : scene.parts;
-  const meshParts = print ? scaleParts(scene.parts, print.mmPerMeter) : scene.parts;
-  const glb = await buildGlb({ parts: glbParts, copyright: credit.short, extras, name: `PLATEAU_${safeFileName(place)}` });
-  const fileName = `plateau_${safeFileName(place)}_${req.size}m_${detailCode(req)}${heightScale !== 1 ? `_h${heightScale}x` : ''}`;
+  const pieces = scene.pieces();
+  const glbPieces = print ? scalePieces(pieces, print.mmPerMeter / 1000) : pieces;
+  const meshPieces = print ? scalePieces(pieces, print.mmPerMeter) : pieces;
+  const glb = await buildGlb({ pieces: glbPieces, copyright: credit.short, extras, name: `PLATEAU_${safeFileName(place)}` });
+  const fileName = `plateau_${safeFileName(place)}_${req.size}m_${detailCode(req)}${heightScale !== 1 ? `_h${heightScale}x` : ''}${separateOf(req) ? '_parts' : ''}`;
   const obj = toObj(
-    meshParts,
+    meshPieces,
     credit.text,
     `${fileName}.mtl`,
     print ? `単位：ミリメートル（縮尺 ${print.scaleLabel}）。+Y が上、-Z が北。範囲の中心が原点、台座の上面が高さ 0` : undefined,
   );
-  const mtl = toMtl(meshParts, credit.text);
-  const stl = toStl(meshParts, stlHeader(`${fileName}_credit.txt`), print !== undefined);
+  const mtl = toMtl(meshPieces, credit.text);
+  const stl = toStl(meshPieces, stlHeader(`${fileName}_credit.txt`), print !== undefined);
 
   // 外形
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
   let triangles = 0;
   let vertices = 0;
-  for (const part of Object.values(scene.parts)) {
+  for (const part of partsOf(pieces)) {
     triangles += part.triangleCount;
     vertices += part.vertexCount;
     const p = part.positions;
@@ -314,6 +322,20 @@ export async function generateFromPlan(
       warnings,
     },
   };
+}
+
+/** 3Dプリンタ用は1つの立体にまとめるので、建物を分けない */
+function separateOf(req: AreaRequest): boolean {
+  return !req.print && req.separateBuildings === true;
+}
+
+/** 部品の一覧に含まれる三角形の集まり（部品のまとまりに属する種類だけ、重複なし） */
+function partsOf(pieces: ModelPiece[]): MeshPart[] {
+  const out = new Set<MeshPart>();
+  for (const piece of pieces) {
+    for (const name of GROUPS.find((g) => g.name === piece.group)!.parts) out.add(piece.parts[name]);
+  }
+  return [...out];
 }
 
 export type DownloadKind = 'glb' | 'obj' | 'stl' | 'all' | 'credit';

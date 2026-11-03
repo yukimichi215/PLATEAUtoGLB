@@ -83,4 +83,4 @@ pre { white-space: pre-wrap; word-break: break-all; font-size: .85rem; backgroun
 footer { color: var(--muted); font-size: .85rem; padding-bottom: 32px; }
 [hidden] { display: none !important; }
 fieldset.use { margin-top: 12px; }
-.print-options { margin-top: 12px; }
+.print-options, .model-options { margin-top: 12px; }

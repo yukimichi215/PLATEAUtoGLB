@@ -25,6 +25,8 @@ const baseMmEl = $<HTMLInputElement>('base-mm');
 const minMmEl = $<HTMLInputElement>('min-mm');
 const overhangHint = $<HTMLSpanElement>('overhang-hint');
 const groundEl = $<HTMLInputElement>('ground');
+const modelOptionsEl = $<HTMLDivElement>('model-options');
+const separateEl = $<HTMLInputElement>('separate');
 const makeBtn = $<HTMLButtonElement>('make-btn');
 const progressEl = $<HTMLDivElement>('progress');
 const progressFill = $<HTMLDivElement>('progress-fill');
@@ -152,6 +154,8 @@ function updatePrintUi(): void {
   fitLabel.hidden = scaleEl.value !== 'fit';
   // 3Dプリンタ用では台座が地面の代わりになり、範囲からはみ出した部分は切り落とす
   groundEl.disabled = print;
+  // 3Dプリンタ用は1つの立体にまとめるので、建物を分ける選択は出さない
+  modelOptionsEl.hidden = print;
   overhangHint.hidden = print;
   if (!print) return;
   const size = Number(sizeEl.value);
@@ -181,6 +185,7 @@ function currentRequest(): AreaRequest {
     placeName: selected!.title,
     print: currentPrint(),
     heightScale: Number(heightScaleEl.value),
+    separateBuildings: separateEl.checked,
   };
 }
 
@@ -244,6 +249,7 @@ makeBtn.addEventListener('click', async () => {
     const s = res.stats;
     statsEl.replaceChildren();
     addStat('建物', `${s.buildings.toLocaleString()} 棟`);
+    if (plan.request.separateBuildings && !s.print) addStat('部品の分け方', `建物を1棟ずつ（${s.buildings.toLocaleString()} 個）＋道路・地面`);
     if (plan.request.installations) {
       addStat(
         'ベランダなどのある建物',

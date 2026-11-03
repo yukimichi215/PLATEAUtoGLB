@@ -1,9 +1,10 @@
 // 三角形の集まりを、PlotBlock で読める GLB（画像も含めて1ファイル・圧縮なし）にする。
-import { Document, WebIO } from '@gltf-transform/core';
-import type { MeshPart, PartName } from './scene.js';
+import { Document, WebIO, type Material, type Mesh } from '@gltf-transform/core';
+import type { GroupName, ModelPiece, Parts, PartName } from './scene.js';
 
 export interface GlbInput {
-  parts: Record<PartName, MeshPart>;
+  /** 出力する部品（SceneBuilder.pieces()） */
+  pieces: ModelPiece[];
   /** asset.copyright に入れる出典の文 */
   copyright: string;
   /** ルートのノードと asset の extras に入れる情報（出典・範囲など） */
@@ -24,7 +25,7 @@ export const MATERIALS: Record<PartName, { name: string; color: [number, number,
 };
 
 /** 部品の名前（GLB の中のノード名・メッシュ名） */
-export const GROUPS: { name: string; parts: PartName[] }[] = [
+export const GROUPS: { name: GroupName; parts: PartName[] }[] = [
   { name: 'Buildings', parts: ['wall', 'roof', 'detail', 'window', 'door'] },
   { name: 'Roads', parts: ['road'] },
   { name: 'Ground', parts: ['ground'] },
@@ -44,19 +45,29 @@ export async function buildGlb(input: GlbInput): Promise<Uint8Array> {
   const root = doc.createNode(input.name).setExtras(input.extras);
   scene.addChild(root);
 
-  for (const group of GROUPS) {
-    const mesh = doc.createMesh(group.name);
-    for (const partName of group.parts) {
-      const part = input.parts[partName];
-      if (part.triangleCount === 0) continue;
+  // 材質は種類ごとに1つだけ作り、建物を1棟ずつ分けたときも共有する
+  const materials = new Map<PartName, Material>();
+  const materialOf = (partName: PartName): Material => {
+    let material = materials.get(partName);
+    if (!material) {
       const m = MATERIALS[partName];
-      const material = doc
+      material = doc
         .createMaterial(m.name)
         .setBaseColorFactor([srgbToLinear(m.color[0]), srgbToLinear(m.color[1]), srgbToLinear(m.color[2]), 1])
         .setMetallicFactor(0)
         .setRoughnessFactor(0.9)
         // 元データの面の向きがそろっていないことがあるので、裏からも見えるようにする
         .setDoubleSided(true);
+      materials.set(partName, material);
+    }
+    return material;
+  };
+  /** 部品の三角形を1つのメッシュにする（種類ごとに材質を分ける）。三角形がなければ null */
+  const meshOf = (name: string, parts: Parts, partNames: PartName[]): Mesh | null => {
+    const mesh = doc.createMesh(name);
+    for (const partName of partNames) {
+      const part = parts[partName];
+      if (part.triangleCount === 0) continue;
       const positions = doc
         .createAccessor()
         .setType('VEC3')
@@ -75,14 +86,33 @@ export async function buildGlb(input: GlbInput): Promise<Uint8Array> {
         .setAttribute('POSITION', positions)
         .setAttribute('NORMAL', normals)
         .setIndices(indices)
-        .setMaterial(material);
+        .setMaterial(materialOf(partName));
       mesh.addPrimitive(prim);
     }
     if (mesh.listPrimitives().length === 0) {
       mesh.dispose();
+      return null;
+    }
+    return mesh;
+  };
+
+  for (const group of GROUPS) {
+    const pieces = input.pieces.filter((p) => p.group === group.name);
+    const only = pieces.length === 1 && pieces[0]!.name === group.name ? pieces[0]! : null;
+    if (only) {
+      // まとめて1つ：グループのノードに直接メッシュを付ける
+      const mesh = meshOf(group.name, only.parts, group.parts);
+      if (mesh) root.addChild(doc.createNode(group.name).setMesh(mesh));
       continue;
     }
-    root.addChild(doc.createNode(group.name).setMesh(mesh));
+    // 1棟ずつ：グループのノードの下に、部品ごとのノードを並べる
+    const groupNode = doc.createNode(group.name);
+    for (const piece of pieces) {
+      const mesh = meshOf(piece.name, piece.parts, group.parts);
+      if (mesh) groupNode.addChild(doc.createNode(piece.name).setMesh(mesh));
+    }
+    if (groupNode.listChildren().length > 0) root.addChild(groupNode);
+    else groupNode.dispose();
   }
 
   const io = new WebIO();

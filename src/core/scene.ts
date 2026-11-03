@@ -5,6 +5,20 @@ import { clipRingToSquare, triangulatePolygon } from './geometry.js';
 import { extrudeDown, footprintArea, MIN_FOOTPRINT_M2, type Solid } from './solid.js';
 
 export type PartName = 'wall' | 'roof' | 'detail' | 'window' | 'door' | 'road' | 'ground';
+export type Parts = Record<PartName, MeshPart>;
+
+/** 出力の部品のまとまり（GLB のノード名・OBJ の o の名前） */
+export type GroupName = 'Buildings' | 'Roads' | 'Ground';
+
+/**
+ * 出力する1つの部品（GLB のノード・OBJ の o）。parts のうち、group に属する種類（建物なら壁・屋根など）だけを使う。
+ * 建物をまとめるときは name が group と同じ1つ、1棟ずつ分けるときは建物ごとに1つ。
+ */
+export interface ModelPiece {
+  name: string;
+  group: GroupName;
+  parts: Parts;
+}
 
 /** 1種類の材質で描く三角形の集まり。法線は面ごと（角ばったローポリの見た目） */
 export class MeshPart {
@@ -79,6 +93,8 @@ export interface SceneOptions {
   solid?: boolean;
   /** 建物の高さだけを何倍にするか（高さの強調。1 でそのまま）。幅・奥行き・道路・台座は変えない */
   heightScale?: number;
+  /** 建物を1棟ずつ別の部品にする（編集ソフトで1棟ずつ選べるように）。閉じた形（solid）のときは使えない */
+  separate?: boolean;
 }
 
 export interface BuildingInfo {
@@ -136,8 +152,22 @@ function offsetOutward(positions: number[], normal: [number, number, number], bx
 /** 道路を地面よりわずかに上に置く高さ（m）。地面とちらつかないため */
 export const ROAD_HEIGHT = 0.15;
 
+/** 種類ごとの空の部品 */
+export function newParts(): Parts {
+  return {
+    wall: new MeshPart(),
+    roof: new MeshPart(),
+    detail: new MeshPart(),
+    window: new MeshPart(),
+    door: new MeshPart(),
+    road: new MeshPart(),
+    ground: new MeshPart(),
+  };
+}
+
 export class SceneBuilder {
-  readonly parts: Record<PartName, MeshPart>;
+  /** 建物（まとめるとき）・道路・地面の三角形。建物を1棟ずつ分けるときは道路・地面だけが入る */
+  readonly parts: Parts;
   /** 3Dプリンタ用（solid）のとき：まとめる前の閉じた形（建物ごとの柱の集まり・道路の板） */
   readonly solids: { buildings: Solid[][]; roads: Solid[] } = { buildings: [], roads: [] };
   readonly buildings: BuildingInfo[] = [];
@@ -156,16 +186,34 @@ export class SceneBuilder {
   /** 窓・扉まである形（LOD3）で入れた建物の数 */
   lod3Buildings = 0;
 
+  /** 建物を1棟ずつ分けるとき（separate）の、建物ごとの部品（入れた順） */
+  private readonly buildingPieces: ModelPiece[] = [];
+  private readonly pieceNames = new Set<string>();
+
   constructor(private readonly opt: SceneOptions) {
-    this.parts = {
-      wall: new MeshPart(),
-      roof: new MeshPart(),
-      detail: new MeshPart(),
-      window: new MeshPart(),
-      door: new MeshPart(),
-      road: new MeshPart(),
-      ground: new MeshPart(),
-    };
+    if (opt.separate && opt.solid) throw new Error('閉じた形（3Dプリンタ用）では建物を1棟ずつ分けられません');
+    this.parts = newParts();
+  }
+
+  /** 出力する部品の一覧。建物（まとめて1つ、または1棟ずつ）→ 道路 → 地面の順 */
+  pieces(): ModelPiece[] {
+    const buildings: ModelPiece[] = this.opt.separate
+      ? this.buildingPieces
+      : [{ name: 'Buildings', group: 'Buildings', parts: this.parts }];
+    return [
+      ...buildings,
+      { name: 'Roads', group: 'Roads', parts: this.parts },
+      { name: 'Ground', group: 'Ground', parts: this.parts },
+    ];
+  }
+
+  /** 建物の部品の名前。PLATEAU の建物 ID（なければ元データの ID）。重なったら番号を付ける */
+  private pieceName(b: Building): string {
+    const base = b.attrs.buildingId || b.id || 'building';
+    let name = base;
+    for (let i = 2; this.pieceNames.has(name); i++) name = `${base}_${i}`;
+    this.pieceNames.add(name);
+    return name;
   }
 
   /**
@@ -254,6 +302,8 @@ export class SceneBuilder {
 
     // 建物の中心（ローカル座標）。窓・扉を外側へ少し浮かせる向きを決めるのに使う
     const [bx, bz] = [cx, cz];
+    // 1棟ずつ分けるときは、この建物だけの部品に入れる
+    const target = this.opt.separate ? newParts() : this.parts;
     let added = 0;
     for (const s of local) {
       // 底の面は見えないので入れない（三角形を減らす）
@@ -265,13 +315,13 @@ export class SceneBuilder {
       if (s.kind === 'window' || s.kind === 'door') {
         // 窓・扉は壁と同じ面に重なっていることが多く、そのままだとちらつくので外側へ少し浮かせる
         offsetOutward(tri.positions, tri.normal, bx, bz, OPENING_OFFSET);
-        this.parts[s.kind].addTriangles(tri.positions, tri.indices, tri.normal);
+        target[s.kind].addTriangles(tri.positions, tri.indices, tri.normal);
         added++;
         continue;
       }
       if (s.kind === 'other' && tri.normal[1] < -0.9) continue; // 下向きの面＝底
       const isRoof = s.kind === 'roof' || (s.kind === 'other' && tri.normal[1] > 0.3);
-      (isRoof ? this.parts.roof : this.parts.wall).addTriangles(tri.positions, tri.indices, tri.normal);
+      (isRoof ? target.roof : target.wall).addTriangles(tri.positions, tri.indices, tri.normal);
       added++;
     }
     if (added === 0) {
@@ -289,13 +339,14 @@ export class SceneBuilder {
         for (const r of holes) this.lift(r, minY);
         const tri = triangulatePolygon(ext, holes);
         if (!tri) continue;
-        this.parts.detail.addTriangles(tri.positions, tri.indices, tri.normal);
+        target.detail.addTriangles(tri.positions, tri.indices, tri.normal);
         installationFaces++;
       }
       if (installationFaces > 0) this.buildingsWithInstallations++;
     }
 
     if (useLod3) this.lod3Buildings++;
+    if (this.opt.separate) this.buildingPieces.push({ name: this.pieceName(b), group: 'Buildings', parts: target });
     this.recordBuilding(b, cx, cz, (maxY - minY) * this.heightScale, useLod3 ? 3 : useLod2 ? 2 : 1, installationFaces);
     return true;
   }
