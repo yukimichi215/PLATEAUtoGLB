@@ -139,6 +139,7 @@ export const ja = {
   'minmm.label': '細い部分を外す（mm）',
   'print.fieldsMore': '台座の厚さを 0 にすると台座なしになります。「細い部分を外す」は、印刷するとこの mm より細い建物・道路を外します（0 で外さない）。',
   'print.hint.size': '印刷したときの台座の大きさ：約 {w} × {w} mm{scale}。',
+  'print.hint.sizeRect': '印刷したときの台座の大きさ：約 {w} × {h} mm{scale}。',
   'print.hint.sizeArea': '印刷したときの台座の大きさ：囲んだ形（約 {w} × {w} mm の四角に入る大きさ）{scale}。',
   'print.hint.scale': '（縮尺 約 1/{d}）',
   'print.hint.rest':
@@ -180,6 +181,7 @@ export const ja = {
   'stats.buildings': '建物',
   'stats.count': '{n} 棟',
   'stats.area': '範囲',
+  'stats.area.rect': '四角（横 {w} m × 縦 {h} m）',
   'stats.area.value': '地図で囲んだ形（{n} 点。一辺 約 {size} m の正方形に入る大きさ）',
   'stats.parts': '部品の分け方',
   'stats.parts.value': '建物を1棟ずつ（{n} 個）＋道路・地面',

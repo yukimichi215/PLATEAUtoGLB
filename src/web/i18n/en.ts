@@ -142,6 +142,7 @@ export const en: Record<MessageKey, string> = {
   'minmm.label': 'Remove thin parts (mm)',
   'print.fieldsMore': 'A base thickness of 0 means no base. "Remove thin parts" removes buildings and roads thinner than this many mm when printed (0 keeps all).',
   'print.hint.size': 'Printed base size: about {w} × {w} mm{scale}. ',
+  'print.hint.sizeRect': 'Printed base size: about {w} × {h} mm{scale}. ',
   'print.hint.sizeArea': 'Printed base size: the drawn shape (fits in about {w} × {w} mm){scale}. ',
   'print.hint.scale': ' (scale about 1/{d})',
   'print.hint.rest':
@@ -183,6 +184,7 @@ export const en: Record<MessageKey, string> = {
   'stats.buildings': 'Buildings',
   'stats.count': '{n}',
   'stats.area': 'Area',
+  'stats.area.rect': 'Rectangle ({w} m wide × {h} m tall)',
   'stats.area.value': 'Shape drawn on the map ({n} points; fits in a square of about {size} m)',
   'stats.parts': 'Parts',
   'stats.parts.value': 'One per building ({n}) + roads and ground',

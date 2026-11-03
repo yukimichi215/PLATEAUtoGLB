@@ -30,6 +30,8 @@ const BAD_STYLE: L.PathOptions = { color: '#c62828', weight: 2, fillOpacity: 0.1
 const CLOSE_PX = 14;
 /** 直前の点のこの距離（画面の px）の中のクリックは、点を足さない（ダブルクリックで同じ点が2つできないように） */
 const SAME_POINT_PX = 6;
+/** 地図を押してから四角を動かすまで待つ時間（この間に2回目が来たらダブルクリック・ダブルタップとして動かさない） */
+const CLICK_MOVE_DELAY_MS = 300;
 
 export class AreaMap {
   private map: L.Map;
@@ -50,6 +52,8 @@ export class AreaMap {
   /** ドラッグで動かした直後のクリックは、移動として扱わない */
   private justMoved = false;
   private centerListener: ((center: LatLon) => void) | null = null;
+  /** 地図を押した所へ動かすのを少し待つタイマー（ダブルクリック・ダブルタップで拡大するときは動かさないため） */
+  private clickTimer: ReturnType<typeof setTimeout> | null = null;
 
   private attribution = '';
 
@@ -69,6 +73,7 @@ export class AreaMap {
     this.map.on('moveend', () => this.viewListener?.(this.view()));
     this.setAttributionLabel(attributionLabel);
     this.map.on('click', (ev: L.LeafletMouseEvent) => this.onClick(ev));
+    this.map.on('dblclick', () => this.cancelClickMove());
     // 正方形・四角は、中を押したまま動かすと移動する（指でも動かせるように pointer の出来事を使う）。
     // 地図を動かす操作より先に受け取るため、capture で受ける（中を押したときだけ地図の移動を止める）
     const c = this.map.getContainer();
@@ -243,7 +248,13 @@ export class AreaMap {
         this.justMoved = false;
         return;
       }
-      if (this.center) this.moveCenter({ lat: ev.latlng.lat, lon: ev.latlng.lng }, true);
+      // 2回目が来なければ動かす（ダブルクリック・ダブルタップは拡大の操作なので、四角は動かさない）
+      this.cancelClickMove();
+      const to = { lat: ev.latlng.lat, lon: ev.latlng.lng };
+      this.clickTimer = setTimeout(() => {
+        this.clickTimer = null;
+        if (this.center && this.mode !== 'polygon') this.moveCenter(to, true);
+      }, CLICK_MOVE_DELAY_MS);
       return;
     }
     if (this.closed) return;
@@ -260,6 +271,11 @@ export class AreaMap {
     }
     this.points.push(p);
     this.redraw();
+  }
+
+  private cancelClickMove(): void {
+    if (this.clickTimer) clearTimeout(this.clickTimer);
+    this.clickTimer = null;
   }
 
   private onPointerDown(ev: PointerEvent): void {

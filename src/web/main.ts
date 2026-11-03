@@ -245,6 +245,7 @@ sizeEl.addEventListener('change', () => {
 });
 sizeHEl.addEventListener('change', () => {
   areaMap?.setRectSize(Number(sizeEl.value), Number(sizeHEl.value));
+  updatePrintUi();
 });
 
 // PLATEAU の建物データがある場所か（データカタログ API。約10km 四方ごとに1回だけ問い合わせて覚える）
@@ -487,8 +488,14 @@ function updatePrintUi(): void {
   const p = currentPrint()!;
   const side = p.fitSideMm ?? (size * 1000) / p.scaleDenominator!;
   const scale = p.fitSideMm ? t('print.hint.scale', { d: Math.round((size * 1000) / p.fitSideMm) }) : '';
-  const sizeKey = draw.mode !== 'square' && draw.polygon ? 'print.hint.sizeArea' : 'print.hint.size';
   // 詳しい説明（print.hint.rest）は畳んだ「詳しく」に置く
+  if (draw.mode === 'rect' && draw.polygon) {
+    // 四角は横・縦をそのまま出す（size は長いほうの辺なので、その比で割り振る）
+    const { width, height } = rectSize();
+    printHintEl.textContent = t('print.hint.sizeRect', { w: ((side * width) / size).toFixed(0), h: ((side * height) / size).toFixed(0), scale });
+    return;
+  }
+  const sizeKey = draw.mode !== 'square' && draw.polygon ? 'print.hint.sizeArea' : 'print.hint.size';
   printHintEl.textContent = t(sizeKey, { w: side.toFixed(0), scale });
 }
 for (const el of [...document.querySelectorAll('input[name="use"]'), scaleEl, fitMmEl, baseMmEl, sizeEl]) {
@@ -496,6 +503,11 @@ for (const el of [...document.querySelectorAll('input[name="use"]'), scaleEl, fi
   el.addEventListener('change', updatePrintUi);
 }
 updatePrintUi();
+
+/** 四角の横・縦の長さ（m） */
+function rectSize(): { width: number; height: number } {
+  return { width: Number(sizeEl.value), height: Number(sizeHEl.value) };
+}
 
 /** 切り出す正方形の一辺（地図で囲んだときは、囲んだ範囲がちょうど入る正方形） */
 function currentSize(): number {
@@ -506,7 +518,7 @@ function currentRequest(): AreaRequest {
   const detail = document.querySelector<HTMLInputElement>('input[name="detail"]:checked')?.value ?? 'box';
   const area =
     draw.mode !== 'square' && draw.polygon
-      ? { ...areaOfPolygon(draw.polygon), polygon: draw.polygon }
+      ? { ...areaOfPolygon(draw.polygon), polygon: draw.polygon, ...(draw.mode === 'rect' ? { rect: rectSize() } : {}) }
       : { center: { lat: selected!.lat, lon: selected!.lon }, size: Number(sizeEl.value) };
   return {
     ...area,
@@ -543,7 +555,8 @@ function renderResultTexts(): void {
   const num = (n: number) => n.toLocaleString(lang() === 'en' ? 'en-US' : 'ja-JP');
   statsEl.replaceChildren();
   addStat(t('stats.buildings'), t('stats.count', { n: num(s.buildings) }));
-  if (request.polygon) addStat(t('stats.area'), t('stats.area.value', { n: request.polygon.length, size: request.size }));
+  if (request.rect) addStat(t('stats.area'), t('stats.area.rect', { w: request.rect.width, h: request.rect.height }));
+  else if (request.polygon) addStat(t('stats.area'), t('stats.area.value', { n: request.polygon.length, size: request.size }));
   if (request.separateBuildings && !s.print) addStat(t('stats.parts'), t('stats.parts.value', { n: num(s.buildings) }));
   if (request.installations) {
     addStat(

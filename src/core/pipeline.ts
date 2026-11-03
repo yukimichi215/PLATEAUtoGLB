@@ -46,6 +46,8 @@ export interface AreaRequest {
    * center・size は、この多角形がちょうど入る正方形にする（areaOfPolygon で求める）
    */
   polygon?: LatLon[];
+  /** 四角（横・縦の長さを選んだ範囲）のときの、横（東西）・縦（南北）の長さ（m）。表示と出典の文に使う（切り出しは polygon で行う） */
+  rect?: { width: number; height: number };
 }
 
 /** 囲んだ範囲を、中心から見たローカル座標の多角形 [x, z, ...] にする */
@@ -254,7 +256,12 @@ export async function generateFromPlan(
   const lat = req.center.lat.toFixed(6);
   const lon = req.center.lon.toFixed(6);
   const n = req.polygon?.length ?? 0;
-  const description: Text = req.polygon
+  const description: Text = req.rect
+    ? {
+        ja: `「${place}」の付近の横 ${req.rect.width} m × 縦 ${req.rect.height} m の四角の範囲を切り出し（中心 緯度 ${lat}・経度 ${lon}）、${detail.ja}の建物にする`,
+        en: `Cut out a ${req.rect.width} m (east–west) × ${req.rect.height} m (north–south) rectangle near "${place}" (center latitude ${lat}, longitude ${lon}) with buildings as ${detail.en}`,
+      }
+    : req.polygon
     ? {
         ja: `「${place}」の地図の上で囲んだ範囲（${n} 点の多角形。ちょうど入る正方形の一辺 ${req.size} m）を切り出し（中心 緯度 ${lat}・経度 ${lon}）、${detail.ja}の建物にする`,
         en: `Cut out an area drawn on the map near "${place}" (a polygon of ${n} points that fits in a ${req.size} m square; center latitude ${lat}, longitude ${lon}) with buildings as ${detail.en}`,
@@ -325,6 +332,7 @@ export async function generateFromPlan(
         heightScale,
         separateBuildings: separateOf(req),
         ...(req.polygon ? { polygon: req.polygon.map((p) => [p.lat, p.lon]) } : {}),
+        ...(req.rect ? { rectMeters: { width: req.rect.width, height: req.rect.height } } : {}),
         origin: print
           ? '範囲の中心・台座の上面が高さ0。単位はメートル（縮尺をかけた大きさ）、+Y が上、-Z が北'
           : '範囲の中心・地面の高さ0。単位はメートル、+Y が上、-Z が北',
