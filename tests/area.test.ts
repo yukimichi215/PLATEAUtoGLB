@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { checkMesh } from '../scripts/lib/check-mesh.js';
 import type { SourceFile } from '../src/core/catalog.js';
 import { LocalProjector, meshBox, meshCode3, meshCodesForBox, metersPerDegree, type LatLon } from '../src/core/geo.js';
-import { meshCodesForPolygon, polygonBox, polygonIssue } from '../src/core/area.js';
+import { dedupePolygon, meshCodesForPolygon, polygonBox, polygonIssue } from '../src/core/area.js';
 import { clipPolygonByRing, isSimpleRing, pointInRing } from '../src/core/geometry.js';
 import { areaOfPolygon, generateFromPlan, validateRequest, type AreaPlan, type AreaRequest, type OpenText } from '../src/core/pipeline.js';
 
@@ -62,6 +62,19 @@ describe('囲んだ範囲の計算', () => {
     expect(polygonIssue(toLatLon([[0, 0], [-50, -50], [50, -50], [0, 0], [50, 50], [-50, 50]]))).toBe('crossing');
     // 点が別の辺の上に乗る
     expect(polygonIssue(toLatLon([[0, 0], [100, 0], [100, 100], [50, 0], [0, 100]]))).toBe('crossing');
+  });
+
+  it('続けて打ったほぼ同じ点は1つにまとめる（ダブルクリックで「交差」と出ないように）', () => {
+    // 最後の点を2回打った形（2回目は 0.1 m ずれ）。そのままだと 0 長さの辺ができて交差あつかいになる
+    const doubled = toLatLon([[0, 0], [100, 0], [100, 100], [0, 100], [0.1, 100]]);
+    expect(polygonIssue(doubled)).toBe('crossing');
+    const cleaned = dedupePolygon(doubled);
+    expect(cleaned.length).toBe(4);
+    expect(polygonIssue(cleaned)).toBeUndefined();
+    // 最初の点と同じ所で閉じた形も、最後の点をまとめる
+    expect(dedupePolygon(toLatLon([[0, 0], [100, 0], [100, 100], [0, 0.2]])).length).toBe(3);
+    // 離れた点はそのまま
+    expect(dedupePolygon(toLatLon(L)).length).toBe(6);
   });
 
   it('メッシュの番号と範囲が合う', () => {

@@ -2,7 +2,7 @@
 // 地図の部品（Leaflet）への依存は、このファイルの中だけにまとめる。
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { areaOfPolygon, polygonIssue, type PolygonIssue } from '../core/area.js';
+import { areaOfPolygon, dedupePolygon, polygonIssue, type PolygonIssue } from '../core/area.js';
 import { LocalProjector, type LatLon } from '../core/geo.js';
 import { MAP_TILES } from './map-config.js';
 
@@ -25,6 +25,8 @@ const STYLE: L.PathOptions = { color: '#1f6feb', weight: 2, fillOpacity: 0.12 };
 const BAD_STYLE: L.PathOptions = { color: '#c62828', weight: 2, fillOpacity: 0.12 };
 /** 最初の点のこの距離（画面の px）の中をクリックすると、囲み終える */
 const CLOSE_PX = 14;
+/** 直前の点のこの距離（画面の px）の中のクリックは、点を足さない（ダブルクリックで同じ点が2つできないように） */
+const SAME_POINT_PX = 6;
 
 export class AreaMap {
   private map: L.Map;
@@ -115,7 +117,7 @@ export class AreaMap {
   }
 
   state(): DrawState {
-    const polygon = this.closed ? this.points.slice() : undefined;
+    const polygon = this.closed ? dedupePolygon(this.points) : undefined;
     const issue = polygon ? polygonIssue(polygon) : undefined;
     return {
       mode: this.mode,
@@ -129,6 +131,8 @@ export class AreaMap {
   private onClick(ev: L.LeafletMouseEvent): void {
     if (this.mode !== 'polygon' || this.closed) return;
     const p = { lat: ev.latlng.lat, lon: ev.latlng.lng };
+    const last = this.points[this.points.length - 1];
+    if (last && this.map.latLngToContainerPoint([last.lat, last.lon]).distanceTo(ev.containerPoint) <= SAME_POINT_PX) return;
     const first = this.points[0];
     if (first && this.points.length >= 3) {
       const a = this.map.latLngToContainerPoint([first.lat, first.lon]);
