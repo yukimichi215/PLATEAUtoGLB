@@ -56,6 +56,9 @@ const dlLinks = Object.fromEntries(
 ) as Record<DownloadKind, HTMLAnchorElement>;
 const clearCacheBtn = $<HTMLButtonElement>('clear-cache');
 const sizeLabel = $<HTMLLabelElement>('size-label');
+const sizeLabelText = $<HTMLSpanElement>('size-label-text');
+const sizeHLabel = $<HTMLLabelElement>('size-h-label');
+const sizeHEl = $<HTMLSelectElement>('size-h');
 const mapWrap = $<HTMLDivElement>('map-wrap');
 const mapNeedPlace = $<HTMLParagraphElement>('map-need-place');
 const mapTools = $<HTMLDivElement>('map-tools');
@@ -81,6 +84,10 @@ let selected: Place | null = null;
 let selectedSituation: Situation | null = null;
 /** シチュエーションの候補の名前（言語ごと） */
 let selectedName: Text | null = null;
+/** 地図で正方形・四角を動かして、選んだ場所から中心がずれたか */
+let movedFrom = false;
+/** 緯度・経度で探した場所か（動かしたあとも、名前の代わりに緯度・経度だけを出すため） */
+let selectedIsLatLon = false;
 /** できあがりの表示に使ったもの（言語を変えたときに出し直す） */
 let lastResult: { stats: GenerateStats; request: AreaRequest; situation: Situation | null } | null = null;
 let busy = false;
@@ -136,6 +143,8 @@ function mb(bytes: number): string {
 
 function selectPlace(p: Place, situation: Situation | null = null, name: Text | null = null): void {
   selected = p;
+  movedFrom = false;
+  selectedIsLatLon = isLatLonTitle(p);
   selectedSituation = situation;
   selectedName = name;
   candidatesEl.hidden = true;
@@ -146,11 +155,22 @@ function selectPlace(p: Place, situation: Situation | null = null, name: Text | 
   if (!areaMap) {
     areaMap = new AreaMap($('map'), onDrawChange, t('map.attribution'));
     areaMap.onViewChange(showCoverageOnMap);
+    areaMap.onCenterChange(moveSelected);
+    areaMap.setRectSize(Number(sizeEl.value), Number(sizeHEl.value));
   }
   areaMap.setMode(currentAreaMode());
   areaMap.show({ lat: p.lat, lon: p.lon }, Number(sizeEl.value));
   setBusy(busy);
   showMessage('');
+  void checkCoverage();
+}
+
+/** 地図で正方形・四角を動かしたとき：選んだ場所（中心）をその位置にする */
+function moveSelected(c: { lat: number; lon: number }): void {
+  if (!selected) return;
+  selected = { ...selected, lat: c.lat, lon: c.lon };
+  movedFrom = true;
+  renderPlace();
   void checkCoverage();
 }
 
@@ -160,12 +180,13 @@ function renderPlace(): void {
   const lat = selected.lat.toFixed(5);
   const lon = selected.lon.toFixed(5);
   // 緯度・経度で探したときは、名前も緯度・経度なので2回出さない
-  if (!selectedName && isLatLonTitle(selected)) {
+  if (!selectedName && selectedIsLatLon) {
     placeEl.textContent = t('place.selectedLatLon', { lat, lon });
     return;
   }
   const title = selectedName ? selectedName[lang()] : coreText(selected.title);
-  placeEl.textContent = t('place.selected', { title, lat, lon });
+  // 地図で動かしたあとは、名前の場所そのものではないので「の近く」と出す
+  placeEl.textContent = t(movedFrom ? 'place.moved' : 'place.selected', { title, lat, lon });
 }
 
 const currentAreaMode = () =>
@@ -174,9 +195,12 @@ const currentAreaMode = () =>
 /** 地図で描いた範囲が変わったとき：説明・ボタン・印刷の大きさの目安を更新する */
 function onDrawChange(s: DrawState): void {
   draw = s;
-  const drawing = s.mode !== 'square';
-  sizeLabel.hidden = drawing;
-  mapTools.hidden = !drawing;
+  sizeLabel.hidden = s.mode === 'polygon';
+  sizeHLabel.hidden = s.mode !== 'rect';
+  // 四角のときは、1つ目の選択を「横の長さ」として使う
+  sizeLabelText.dataset.i18n = s.mode === 'rect' ? 'size.width' : 'size.label';
+  sizeLabelText.textContent = t(s.mode === 'rect' ? 'size.width' : 'size.label');
+  mapTools.hidden = s.mode !== 'polygon';
   mapUndo.hidden = s.mode !== 'polygon';
   mapFinish.hidden = s.mode !== 'polygon';
   mapUndo.disabled = s.drawingPoints === 0;
@@ -196,10 +220,11 @@ function drawHint(s: DrawState): string {
   if (s.issue === 'tooSmall') return t('map.hint.tooSmall');
   if (s.issue === 'crossing') return t('map.hint.crossing');
   if (s.issue === 'tooLarge') return t('map.hint.tooLarge', { max: MAX_SIZE, size: s.size ?? 0 });
-  if (s.polygon) return t('map.hint.done', { size: s.size ?? 0, n: s.polygon.length });
   if (s.mode === 'rect') return t('map.hint.rect');
+  if (s.polygon) return t('map.hint.done', { size: s.size ?? 0, n: s.polygon.length });
   if (s.mode === 'polygon') {
-    return s.drawingPoints === 0 ? t('map.hint.polygonStart') : t('map.hint.polygonMore', { n: s.drawingPoints });
+    if (s.drawingPoints === 0) return t('map.hint.polygonStart');
+    return s.drawingPoints === 1 ? t('map.hint.polygonStart') : t('map.hint.polygonMore', { n: s.drawingPoints, size: s.size ?? 0 });
   }
   return t('map.hint.square');
 }
@@ -215,7 +240,11 @@ mapFinish.addEventListener('click', () => areaMap?.finishPolygon());
 $<HTMLButtonElement>('map-clear').addEventListener('click', () => areaMap?.clearDrawing());
 sizeEl.addEventListener('change', () => {
   areaMap?.setSize(Number(sizeEl.value));
+  areaMap?.setRectSize(Number(sizeEl.value), Number(sizeHEl.value));
   void checkCoverage();
+});
+sizeHEl.addEventListener('change', () => {
+  areaMap?.setRectSize(Number(sizeEl.value), Number(sizeHEl.value));
 });
 
 // PLATEAU の建物データがある場所か（データカタログ API。約10km 四方ごとに1回だけ問い合わせて覚える）
