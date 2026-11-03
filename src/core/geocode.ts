@@ -66,6 +66,16 @@ export function parseGsiResult(json: unknown, query = '', max = 10): Place[] {
   return out;
 }
 
+/** 緯度・経度で探したときの名前 */
+export function latLonTitle(ll: LatLon): string {
+  return `緯度 ${ll.lat}・経度 ${ll.lon}`;
+}
+
+/** 名前が緯度・経度そのもの（latLonTitle で作ったもの）か */
+export function isLatLonTitle(p: Place): boolean {
+  return p.title === latLonTitle(p);
+}
+
 export async function searchPlace(
   text: string,
   fetchJson: (url: string) => Promise<unknown>,
@@ -73,7 +83,7 @@ export async function searchPlace(
   const q = text.trim();
   if (q === '') return [];
   const ll = parseLatLon(q);
-  if (ll) return [{ ...ll, title: `緯度 ${ll.lat}・経度 ${ll.lon}` }];
+  if (ll) return [{ ...ll, title: latLonTitle(ll) }];
   const json = await fetchJson(`${GSI_ADDRESS_SEARCH}?q=${encodeURIComponent(q)}`);
   return parseGsiResult(json, q);
 }

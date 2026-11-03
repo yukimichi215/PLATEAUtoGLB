@@ -51,10 +51,10 @@ body {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 16px;
-  margin-bottom: 16px;
+  padding: 20px;
+  margin-bottom: 20px;
 }
-h2 { margin: 0 0 12px; font-size: 1.15rem; display: flex; align-items: center; gap: 8px; }
+h2 { margin: 0 0 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
 .step {
   display: inline-grid; place-items: center;
   width: 1.6em; height: 1.6em; border-radius: 50%;
@@ -74,15 +74,15 @@ button, .button {
 .primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; }
 button:disabled { opacity: .5; cursor: not-allowed; }
 .link { border: none; background: none; color: var(--accent); padding: 0; text-decoration: underline; }
-.hint { color: var(--muted); font-size: .9rem; margin: 8px 0 0; }
-.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
-.grid label { display: flex; flex-direction: column; gap: 4px; }
-fieldset { border: 1px solid var(--border); border-radius: 8px; margin: 0; padding: 8px 12px; }
-legend { padding: 0 4px; }
+.hint { color: var(--muted); font-size: .88rem; margin: 6px 0 0; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px 16px; }
+.grid label { display: flex; flex-direction: column; justify-content: flex-end; gap: 4px; }
+fieldset { border: none; margin: 0; padding: 0; min-width: 0; }
+legend { padding: 0; margin-bottom: 6px; font-weight: 600; }
 label.inline { display: flex; flex-direction: row; align-items: center; gap: 6px; }
 .candidates { list-style: none; padding: 0; margin: 12px 0 0; display: grid; gap: 6px; }
 .candidates button { width: 100%; text-align: left; }
-.place { margin: 12px 0 0; font-weight: 600; }
+.place { margin: 0; font-weight: 600; }
 .progress { margin-top: 12px; }
 .bar { height: 10px; border-radius: 5px; background: var(--border); overflow: hidden; }
 #progress-fill { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
@@ -91,9 +91,7 @@ label.inline { display: flex; flex-direction: row; align-items: center; gap: 6px
 .preview { position: relative; width: 100%; aspect-ratio: 16 / 10; background: var(--preview-bg); border-radius: 8px; overflow: hidden; touch-action: none; }
 .preview-scale { position: absolute; left: 8px; bottom: 8px; padding: 2px 8px; border-radius: 6px; background: var(--card); color: var(--text); font-size: .8rem; opacity: .85; pointer-events: none; }
 .view-buttons { margin-top: 8px; }
-.situation { margin-top: 8px; }
-.situation summary { cursor: pointer; }
-.situation label { display: block; margin-top: 8px; }
+.situation label { display: flex; flex-direction: column; gap: 4px; }
 .situation-evidence { margin-top: 12px; padding: 8px 12px; border-left: 3px solid var(--muted); }
 .situation-evidence h3 { margin: 0 0 4px; font-size: 1rem; }
 .stats { display: grid; grid-template-columns: max-content 1fr; gap: 2px 16px; margin: 12px 0; }
@@ -102,24 +100,19 @@ label.inline { display: flex; flex-direction: row; align-items: center; gap: 6px
 pre { white-space: pre-wrap; word-break: break-all; font-size: .85rem; background: var(--bg); padding: 8px; border-radius: 8px; }
 footer { color: var(--muted); font-size: .85rem; padding-bottom: 32px; }
 [hidden] { display: none !important; }
-fieldset.use { margin-top: 12px; }
-.print-options, .model-options { margin-top: 12px; }
-
-.area-mode { margin-bottom: 8px; }
-.map-wrap { margin-bottom: 12px; }
 .map { height: 360px; border-radius: 8px; border: 1px solid var(--border); }
 .map.drawing { cursor: crosshair; user-select: none; -webkit-user-select: none; }
 .map-tools { margin-top: 8px; }
+.map-wrap { margin-top: 12px; }
 /* PLATEAU の建物データがある所の枠の見本（area-map.ts の COVERAGE_STYLE と同じ色） */
 .coverage-swatch { display: inline-block; width: 12px; height: 12px; margin-right: 6px; vertical-align: -1px; border: 1px solid #2e7d32; background: rgba(67, 160, 71, 0.15); }
 .coverage-note.error { color: var(--error); font-weight: 600; }
 
 /* 対応地域の一覧 */
-.lod-filter { margin-top: 8px; display: grid; gap: 4px; }
 .city-groups { margin-top: 8px; display: grid; gap: 4px; }
 .city-groups details.pref { border: 1px solid var(--border); border-radius: 8px; padding: 4px 10px; }
 .city-groups details.pref > summary { cursor: pointer; padding: 6px 0; font-weight: 600; }
-.city-items { list-style: none; padding: 0; margin: 4px 0 8px; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.city-items { list-style: none; padding: 0; margin: 4px 0 8px; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(150px, 100%), 1fr)); gap: 6px; }
 .city-items > li:has(.lod3-places) { grid-column: 1 / -1; }
 .city-items button.city { width: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; text-align: left; }
 .lod-badge { font-size: .7rem; font-weight: 700; padding: 1px 5px; border-radius: 4px; border: 1px solid currentColor; line-height: 1.3; }
@@ -127,3 +120,63 @@ fieldset.use { margin-top: 12px; }
 .lod-badge.lod3 { color: #b35900; }
 .lod3-places { list-style: none; padding: 0 0 0 16px; margin: 4px 0 0; display: grid; gap: 4px; }
 .lod3-places button { width: 100%; text-align: left; font-size: .9rem; }
+
+/* 画面の調整（候補機能18）：手順ごとの区切り・余白・選ぶものの見た目 */
+/* カードの中の項目どうしの間をそろえる */
+.card > * + * { margin-top: 16px; }
+.card > h2 + * { margin-top: 0; }
+.card > .hint, .card > p.hint { margin-top: 6px; }
+.card > details.more { margin-top: 6px; }
+.field { display: flex; flex-direction: column; gap: 4px; max-width: 320px; }
+.field-label { font-weight: 600; }
+.grid .field-label { font-weight: 600; font-size: .92rem; }
+.indent { margin-left: 26px; }
+
+/* 1つだけ選ぶ（横に並ぶボタン）：地図アプリの表示切り替えのような見た目 */
+.segmented > label { display: inline-flex; align-items: center; gap: 6px; margin: 0 6px 6px 0; padding: 8px 14px; border: 1px solid var(--border); border-radius: 999px; background: var(--bg); cursor: pointer; }
+.segmented > label:has(input:checked) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--card)); font-weight: 600; }
+.segmented > label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* 1つだけ選ぶ（縦に並ぶ選択肢） */
+.choices > label { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; }
+.choices > label + label { margin-top: 6px; }
+.choices > label:has(input:checked) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--card)); }
+.choices > label:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.print-same { color: var(--muted); font-size: .85rem; }
+
+/* 畳んだ枠（ほかの探し方・詳しい設定） */
+/* 中の一覧が広くても、画面からはみ出さないように（minmax(0, 1fr)・min-width: 0） */
+.other-ways { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+details.panel { border: 1px solid var(--border); border-radius: 10px; background: var(--bg); min-width: 0; }
+details.panel > summary { cursor: pointer; padding: 12px 14px; list-style: none; }
+details.panel > summary::-webkit-details-marker { display: none; }
+/* 矢印は見出しと一緒に置き、補足の文だけが次の行へ折り返す */
+details.panel > summary .summary-title::before { content: '▸'; display: inline-block; width: 1.1em; color: var(--muted); }
+details.panel[open] > summary .summary-title::before { content: '▾'; }
+.summary-sub { margin-left: 10px; display: inline-block; }
+details.panel[open] > summary { border-bottom: 1px solid var(--border); }
+.summary-title { font-weight: 600; }
+.summary-sub { color: var(--muted); font-size: .85rem; }
+.panel-body { padding: 14px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.panel-body > * { margin: 0; }
+
+/* 畳んだ「詳しく」 */
+details.more > summary { cursor: pointer; color: var(--accent); font-size: .88rem; width: fit-content; }
+details.more > p { margin-top: 4px; }
+
+/* 選んだ場所 */
+.selected-place:not(:has(:not([hidden]))) { display: none; }
+.selected-place { padding: 10px 14px; border-left: 4px solid var(--accent); background: color-mix(in srgb, var(--accent) 7%, var(--card)); border-radius: 0 8px 8px 0; }
+.selected-place .coverage-note { margin-top: 4px; }
+
+/* 場所を選ぶ前の地図の代わり */
+.empty-note { padding: 24px 12px; text-align: center; border: 1px dashed var(--border); border-radius: 8px; }
+
+/* 狭い画面でも「検索」を入力欄の右に置く */
+.search-row { flex-wrap: nowrap; }
+.search-row input[type='search'] { padding: 10px 12px; flex: 1 1 auto; min-width: 0; }
+.search-row button { flex: none; }
+button.big { padding: 12px 28px; font-size: 1.05rem; width: 100%; }
+.downloads { gap: 8px; }
+.result h2 .step.done { background: #2e7d32; color: #fff; }
+footer details.more > p { font-size: .85rem; }
