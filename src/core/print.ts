@@ -1,5 +1,6 @@
 // 3Dプリンタ用の仕上げ：縮尺を決め、台座を敷き、閉じた形の柱の下端・道路の高さを決める。
 import { MeshPart, SOLID_BOTTOM, SOLID_ROAD_TOP, type PartName, type SceneBuilder } from './scene.js';
+import { minWidth2d } from './geometry.js';
 import { box, type Solid } from './solid.js';
 import { unionSolids, type UnionGroup } from './union.js';
 
@@ -10,6 +11,11 @@ export interface PrintOptions {
   fitSideMm?: number;
   /** 台座の厚さ（印刷したときの mm）。0 なら台座なし */
   baseMm: number;
+  /**
+   * 細かすぎる部分の省略：上から見たいちばん細い向きの幅が、印刷したときにこの長さ（mm）より細い建物・道路を外す。
+   * 指定しないときは DEFAULT_MIN_FEATURE_MM。0 なら外さない
+   */
+  minFeatureMm?: number;
 }
 
 export const MIN_DENOMINATOR = 100;
@@ -17,6 +23,9 @@ export const MAX_DENOMINATOR = 100000;
 export const MIN_FIT_MM = 10;
 export const MAX_FIT_MM = 2000;
 export const MAX_BASE_MM = 50;
+/** 一般的な家庭用 3D プリンタ（ノズル 0.4mm）で、形として残る細さの目安（2本分の線の幅） */
+export const DEFAULT_MIN_FEATURE_MM = 0.8;
+export const MAX_MIN_FEATURE_MM = 10;
 /** 印刷で見分けられない細かさ（mm）。これより細かい凹凸はならして三角形を減らす */
 export const PRINT_TOLERANCE_MM = 0.01;
 /** 道路の板の厚さ（印刷したときの mm）。台座の上に少し盛り上がって見える厚さ */
@@ -33,6 +42,9 @@ export function validatePrint(p: PrintOptions): void {
   if (!(p.baseMm >= 0 && p.baseMm <= MAX_BASE_MM)) {
     throw new Error(`台座の厚さは 0〜${MAX_BASE_MM} mm の範囲で指定してください。`);
   }
+  if (p.minFeatureMm !== undefined && !(p.minFeatureMm >= 0 && p.minFeatureMm <= MAX_MIN_FEATURE_MM)) {
+    throw new Error(`外す細さは 0〜${MAX_MIN_FEATURE_MM} mm の範囲で指定してください。`);
+  }
 }
 
 export interface PrintInfo {
@@ -43,6 +55,11 @@ export interface PrintInfo {
   baseMm: number;
   /** 形がくずれていて閉じた形にできず、入れられなかった屋根の面・道路の数 */
   droppedFaces: number;
+  /** 細かすぎる部分の省略に使った細さ（mm。0 なら省略なし） */
+  minFeatureMm: number;
+  /** 細すぎて外した建物・道路の数 */
+  removedBuildings: number;
+  removedRoads: number;
   /** 印刷したときの大きさ（mm） */
   widthMm: number;
   depthMm: number;
@@ -74,9 +91,15 @@ export async function finishForPrint(scene: SceneBuilder, half: number, opt: Pri
     positions: s.positions.map((v, i) => (i % 3 === 1 ? (heights.get(v) ?? v) : v)),
     indices: s.indices,
   });
+  // 細かすぎる部分の省略：上から見て、印刷すると minFeatureMm より細い建物・道路は外す
+  const minFeatureMm = opt.minFeatureMm ?? DEFAULT_MIN_FEATURE_MM;
+  const minWidthM = minFeatureMm / mmPerMeter;
+  const wide = (solids: Solid[]) => minFeatureMm <= 0 || minWidth2d(solids.flatMap((s) => xzOf(s, half))) >= minWidthM;
+  const buildings = scene.solids.buildings.filter(wide);
+  const roads = scene.solids.roads.filter((r) => wide([r]));
   const groups: UnionGroup<'roof' | 'road' | 'ground'>[] = [
-    { key: 'roof', solids: scene.solids.buildings.map(resolve) },
-    { key: 'road', solids: scene.solids.roads.map(resolve) },
+    { key: 'roof', solids: buildings.flat().map(resolve) },
+    { key: 'road', solids: roads.map(resolve) },
   ];
   if (baseM > 0) groups.push({ key: 'ground', solids: [box(-half, half, -baseM, 0, -half, half)] });
   // 印刷で 0.001 mm³ に満たないかけらは除き、0.01 mm より細かい凹凸はならす（実物の大きさに直して渡す）
@@ -97,10 +120,24 @@ export async function finishForPrint(scene: SceneBuilder, half: number, opt: Pri
     scaleLabel: opt.fitSideMm !== undefined ? `約${scaleLabelOf(mmPerMeter)}` : `1/${opt.scaleDenominator}`,
     baseMm: opt.baseMm,
     droppedFaces: scene.droppedFaces,
+    minFeatureMm,
+    removedBuildings: scene.solids.buildings.length - buildings.length,
+    removedRoads: scene.solids.roads.length - roads.length,
     widthMm: r1(2 * half * mmPerMeter),
     depthMm: r1(2 * half * mmPerMeter),
     heightMm: r1(maxY * mmPerMeter + opt.baseMm),
   };
+}
+
+/**
+ * 立体の頂点を上から見た点（[x, z, ...]）。範囲の外の点は範囲の線まで寄せる
+ * （範囲の端で切り落としたあとに残る部分の細さで判断するため）
+ */
+function xzOf(s: Solid, half: number): number[] {
+  const out: number[] = [];
+  const c = (v: number) => Math.max(-half, Math.min(half, v));
+  for (let i = 0; i < s.positions.length; i += 3) out.push(c(s.positions[i]!), c(s.positions[i + 2]!));
+  return out;
 }
 
 /** 大きさを k 倍した部品の写し */

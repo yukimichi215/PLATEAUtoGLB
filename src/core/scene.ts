@@ -138,8 +138,8 @@ export const ROAD_HEIGHT = 0.15;
 
 export class SceneBuilder {
   readonly parts: Record<PartName, MeshPart>;
-  /** 3Dプリンタ用（solid）のとき：まとめる前の閉じた形（建物の柱・道路の板） */
-  readonly solids: { buildings: Solid[]; roads: Solid[] } = { buildings: [], roads: [] };
+  /** 3Dプリンタ用（solid）のとき：まとめる前の閉じた形（建物ごとの柱の集まり・道路の板） */
+  readonly solids: { buildings: Solid[][]; roads: Solid[] } = { buildings: [], roads: [] };
   readonly buildings: BuildingInfo[] = [];
   readonly cities = new Set<string>();
   private readonly seen = new Set<string>();
@@ -349,7 +349,7 @@ export class SceneBuilder {
         else failed++;
       }
       if (solids.length > 0) {
-        this.solids.buildings.push(...solids);
+        this.solids.buildings.push(solids);
         this.droppedFaces += failed;
         return true;
       }

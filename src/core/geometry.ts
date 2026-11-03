@@ -136,3 +136,42 @@ function clipRing(ring: number[], half: number, stride: number, ax: number, az: 
   }
   return pts.length >= stride * 3 ? pts : [];
 }
+
+/**
+ * 点の集まり（[x, z, x, z, ...]）を上から見たときの「いちばん細い向きの幅」（凸包の最小の幅）。
+ * 細長い建物なら短い辺の長さ、点や線のようにつぶれていれば 0。
+ */
+export function minWidth2d(pts: number[]): number {
+  const p: [number, number][] = [];
+  for (let i = 0; i + 1 < pts.length; i += 2) p.push([pts[i]!, pts[i + 1]!]);
+  p.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  if (p.length < 3) return 0;
+  // 凸包（Andrew の方法）
+  const cross = (o: [number, number], a: [number, number], b: [number, number]) =>
+    (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lower: [number, number][] = [];
+  for (const q of p) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2]!, lower[lower.length - 1]!, q) <= 0) lower.pop();
+    lower.push(q);
+  }
+  const upper: [number, number][] = [];
+  for (let i = p.length - 1; i >= 0; i--) {
+    const q = p[i]!;
+    while (upper.length >= 2 && cross(upper[upper.length - 2]!, upper[upper.length - 1]!, q) <= 0) upper.pop();
+    upper.push(q);
+  }
+  const hull = lower.slice(0, -1).concat(upper.slice(0, -1));
+  if (hull.length < 3) return 0;
+  // 凸包の各辺について、いちばん遠い点までの距離。その最小が幅
+  let best = Infinity;
+  for (let i = 0; i < hull.length; i++) {
+    const a = hull[i]!;
+    const b = hull[(i + 1) % hull.length]!;
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (len < 1e-12) continue;
+    let far = 0;
+    for (const q of hull) far = Math.max(far, Math.abs(cross(a, b, q)) / len);
+    best = Math.min(best, far);
+  }
+  return Number.isFinite(best) ? best : 0;
+}

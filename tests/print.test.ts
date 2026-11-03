@@ -221,6 +221,35 @@ describe('範囲の端で切り落とす（へこんだ形）', () => {
     for (const p of list) expect(p.volume).toBeCloseTo(400, 1);
   });
 
+  it('範囲の端で切り落としたあとに細く残るだけの建物は、細かすぎる部分として外す', async () => {
+    const center = { lat: 35.68, lon: 139.76 };
+    const m = metersPerDegree(center.lat);
+    const ring = (pts: number[][], h: number) =>
+      pts.flatMap(([x, z]) => [center.lat - z! / m.lat, center.lon + x! / m.lon, h]);
+    // x = 9.7〜30 の長方形（範囲は x = ±10 なので、中に残るのは幅 0.3 m だけ）。
+    // 左の辺に点を多く置き、点の平均（建物の中心）を範囲の中にする
+    const left = Array.from({ length: 300 }, (_, i) => [9.7, 5 - (10 * i) / 299]);
+    const rect = [...left, [30, -5], [30, 5]];
+    const building: Building = {
+      id: 'edge-sliver',
+      attrs: {},
+      lod1: [
+        { exterior: ring(rect, 10), interiors: [] },
+        { exterior: ring([...rect].reverse(), 0), interiors: [] },
+      ],
+      lod2: [],
+      installations: [],
+      lod3: [],
+      installations3: [],
+    };
+    const scene = new SceneBuilder({ projector: new LocalProjector(center), half: 10, lod: 1, solid: true });
+    expect(scene.addBuilding(building)).toBe(true);
+    // 1/1000 で 0.8 mm（実物 0.8 m）より細いものを外す。残る幅は 0.3 m
+    const info = await finishForPrint(scene, 10, { scaleDenominator: 1000, baseMm: 0, minFeatureMm: 0.8 });
+    expect(info.removedBuildings).toBe(1);
+    expect(scene.parts.roof.triangleCount).toBe(0);
+  });
+
   it('上から見てごく小さな屋根の面（10 cm 角未満）は、くずれた面として数えずに省く', async () => {
     const center = { lat: 35.68, lon: 139.76 };
     const m = metersPerDegree(center.lat);

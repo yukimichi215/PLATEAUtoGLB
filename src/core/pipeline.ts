@@ -213,6 +213,9 @@ export async function generateFromPlan(
         `道路は厚さ ${ROAD_PRINT_MM} mm の板にする`,
         ...(print.baseMm > 0 ? [`厚さ ${print.baseMm} mm の台座を加え、建物・道路の下端を台座に食い込ませる`] : []),
         ...(print.droppedFaces > 0 ? [`元データの形がくずれていて閉じた形にできない面 ${print.droppedFaces} 枚を省く`] : []),
+        ...(print.removedBuildings + print.removedRoads > 0
+          ? [`印刷すると ${print.minFeatureMm} mm より細い建物 ${print.removedBuildings} 棟・道路 ${print.removedRoads} か所を省く`]
+          : []),
       ]
     : [];
   const heightScale = req.heightScale ?? 1;
