@@ -2,6 +2,6 @@
 // 例：ofuse: 'https://ofuse.me/xxxx'、githubSponsors: 'https://github.com/sponsors/xxxx'
 // https:// で始まる URL だけを使う（ほかは無視する）。
 export const DONATE_CONFIG = {
-  ofuse: '',
+  ofuse: 'https://ofuse.me/yukimichi',
   githubSponsors: '',
 };

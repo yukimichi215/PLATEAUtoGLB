@@ -155,10 +155,10 @@ export interface GenerateResult {
 export function detailLabel(req: AreaRequest): Text {
   if (req.print) {
     return req.lod === 1
-      ? { ja: '箱型（LOD1）', en: 'boxes (LOD1)' }
+      ? { ja: '箱型（LOD1）', en: 'simple boxes (LOD1)' }
       : { ja: `屋根の形あり（LOD${req.lod === 3 ? '3 の屋根' : '2'}）`, en: `roof shapes (${req.lod === 3 ? 'LOD3 roofs' : 'LOD2'})` };
   }
-  if (req.lod === 1) return { ja: '箱型（LOD1）', en: 'boxes (LOD1)' };
+  if (req.lod === 1) return { ja: '箱型（LOD1）', en: 'simple boxes (LOD1)' };
   if (req.lod === 3) {
     return {
       ja: `窓・扉まである形（LOD3。LOD3 のない建物は屋根の形〔LOD2〕で代用${req.installations ? '、付属物あり' : ''}）`,
@@ -257,11 +257,11 @@ export async function generateFromPlan(
   const description: Text = req.polygon
     ? {
         ja: `「${place}」の地図の上で囲んだ範囲（${n} 点の多角形。ちょうど入る正方形の一辺 ${req.size} m）を切り出し（中心 緯度 ${lat}・経度 ${lon}）、${detail.ja}の建物にする`,
-        en: `Cut out an area drawn on the map near "${place}" (a polygon of ${n} points that fits in a ${req.size} m square; center latitude ${lat}, longitude ${lon}) and made the buildings as ${detail.en}`,
+        en: `Cut out an area drawn on the map near "${place}" (a polygon of ${n} points that fits in a ${req.size} m square; center latitude ${lat}, longitude ${lon}) with buildings as ${detail.en}`,
       }
     : {
         ja: `「${place}」を中心に一辺 ${req.size} m の範囲を切り出し（中心 緯度 ${lat}・経度 ${lon}）、${detail.ja}の建物にする`,
-        en: `Cut out a ${req.size} m square centered on "${place}" (center latitude ${lat}, longitude ${lon}) and made the buildings as ${detail.en}`,
+        en: `Cut out a ${req.size} m square centered on "${place}" (center latitude ${lat}, longitude ${lon}) with buildings as ${detail.en}`,
       };
   const scaleEn = print?.scaleLabel.replace(/^約/, 'about ');
   const processing: Text[] = print
@@ -303,9 +303,11 @@ export async function generateFromPlan(
   const extras = {
     plateau: {
       attribution: credit.short,
+      attributionEn: credit.shortEn,
       license: LICENSE_TEXT,
       modified: true,
       notice: '国土交通省・各自治体が作成したものではありません。PLATEAUtoGLB で加工して作成。',
+      noticeEn: 'This was not created by MLIT or any municipality. Processed with PLATEAUtoGLB.',
       sources: credit.sources.map((s) => ({
         city: s.cityName,
         cityCode: s.cityCode,

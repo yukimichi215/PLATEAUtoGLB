@@ -29,13 +29,11 @@ export function donateLinks(cfg: DonateConfig, lang: string, labelOf: (s: Donate
   return order.filter((s) => usable(cfg[s])).map((s) => ({ service: s, label: labelOf(s), url: cfg[s].trim() }));
 }
 
-// 絵はアプリに同梱する自作のもの（各サービスのロゴは使わない）。ハート：Sponsors、封筒とハート：OFUSE（ファンレター）
-const ICONS: Record<DonateService, string> = {
-  githubSponsors:
-    '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 21s-7.5-4.6-9.6-9.3C1 8.4 3 5 6.4 5c2 0 3.4 1 4.1 2.3h3C14.2 6 15.6 5 17.6 5 21 5 23 8.4 21.6 11.7 19.5 16.4 12 21 12 21z"/></svg>',
-  ofuse:
-    '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3 6.5l9 6.5 9-6.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path fill="currentColor" d="M12 18.2s-3.2-1.9-4-3.8c-.5-1.3.3-2.6 1.6-2.6.9 0 1.6.5 2.4 1.3.8-.8 1.5-1.3 2.4-1.3 1.3 0 2.1 1.3 1.6 2.6-.8 1.9-4 3.8-4 3.8z"/></svg>',
-};
+// GitHub Sponsors の絵はアプリに同梱する自作のハート（GitHub のロゴは使わない）
+const SPONSORS_ICON =
+  '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 21s-7.5-4.6-9.6-9.3C1 8.4 3 5 6.4 5c2 0 3.4 1 4.1 2.3h3C14.2 6 15.6 5 17.6 5 21 5 23 8.4 21.6 11.7 19.5 16.4 12 21 12 21z"/></svg>';
+// OFUSE は公式アイコン（OFUSE KIT、© 株式会社Sozi）をそのまま同梱して使う。改変禁止・MIT の対象外（assets/ofuse/NOTICE.md）
+const OFUSE_ICON_URL = new URL('./assets/ofuse/icon-blue.svg', import.meta.url).href;
 
 /** ボタンを container に並べる。出すものがなければ container を隠す */
 export function renderDonate(container: HTMLElement, links: DonateLink[]): void {
@@ -47,8 +45,19 @@ export function renderDonate(container: HTMLElement, links: DonateLink[]): void 
     a.href = l.url;
     a.target = '_blank';
     a.rel = 'noopener noreferrer';
-    a.innerHTML = ICONS[l.service];
-    a.append(l.label);
+    if (l.service === 'ofuse') {
+      // 縦横比を保ったまま大きさだけを合わせる（公式素材の決まり）
+      const img = document.createElement('img');
+      img.src = OFUSE_ICON_URL;
+      img.alt = '';
+      img.className = 'donate-icon';
+      a.append(img);
+    } else {
+      a.innerHTML = SPONSORS_ICON;
+    }
+    const label = document.createElement('span');
+    label.textContent = l.label;
+    a.append(label);
     container.append(a);
   }
 }

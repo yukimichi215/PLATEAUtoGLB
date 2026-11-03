@@ -92,3 +92,16 @@ describe('建物の情報を部品に残す', () => {
     expect(usageName(undefined)).toBeUndefined();
   });
 });
+
+describe('GLB の出典', () => {
+  it('extras に日本語の出典と英訳の両方が入る（asset.copyright は日本語のまま）', async () => {
+    const res = await generateFromPlan(plan({}), openText);
+    const doc = await new WebIO().readBinary(res.glb);
+    const asset = doc.getRoot().getAsset();
+    expect(asset.copyright).toBe(res.copyright);
+    const plateau = (asset.extras as { plateau: Record<string, string> }).plateau;
+    expect(plateau.attribution).toBe(res.copyright);
+    expect(plateau.attributionEn).toContain('Processed from "3D City Model (Project PLATEAU) 千代田区 (FY2025)"');
+    expect(plateau.noticeEn).toContain('This was not created by');
+  });
+});

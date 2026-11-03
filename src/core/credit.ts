@@ -10,6 +10,7 @@ const DATASET_NAMES_EN: Record<string, string> = { 建築物モデル: 'building
 
 /** PLATEAU のデータの利用条件（2026-11 時点。公式サイトポリシーで要確認） */
 export const LICENSE_TEXT = '公共データ利用規約（第1.0版）（CC BY 4.0 互換）';
+export const LICENSE_TEXT_EN = 'Public Data License (Version 1.0) (compatible with CC BY 4.0)';
 export const SITE_POLICY_URL = 'https://www.mlit.go.jp/plateau/site-policy/';
 
 export interface CreditSource {
@@ -24,6 +25,8 @@ export interface CreditInfo {
   sources: CreditSource[];
   /** 1行で書いた出典（asset.copyright 用） */
   short: string;
+  /** short の英訳（参考。GLB の extras 用） */
+  shortEn: string;
   /** クレジットの文章ファイルの中身 */
   text: string;
 }
@@ -61,6 +64,10 @@ export function buildCredit(
     (s) => `「3D都市モデル（Project PLATEAU）${s.cityName}（${s.year}年度）」（国土交通省）`,
   );
   const short = `${titles.join('、')}を加工して作成（${LICENSE_TEXT}）`;
+  const titlesEn = sources.map(
+    (s) => `"3D City Model (Project PLATEAU) ${s.cityName} (FY${s.year})" (Ministry of Land, Infrastructure, Transport and Tourism)`,
+  );
+  const shortEn = `Processed from ${titlesEn.join(', ')} (${LICENSE_TEXT_EN})`;
 
   const lines: string[] = [];
   lines.push('【出典】');
@@ -93,13 +100,12 @@ export function buildCredit(
   lines.push('----');
   lines.push('[English translation for reference. The Japanese text above is the original.]');
   lines.push('Source:');
-  lines.push(
-    `Processed from ${sources.map((s) => `"3D City Model (Project PLATEAU) ${s.cityName} (FY${s.year})" (Ministry of Land, Infrastructure, Transport and Tourism)`).join(', ')}`,
-  );
+  lines.push(`Processed from ${titlesEn.join(', ')}`);
   for (const s of sources) {
     lines.push(`- ${s.cityName} (municipality code ${s.cityCode}, FY${s.year})`);
     lines.push(`  Data used: ${s.datasets.map((d) => DATASET_NAMES_EN[d] ?? d).join(', ')}`);
-    lines.push('  License: Public Data License (Version 1.0) (compatible with CC BY 4.0)');
+    lines.push(`  License: ${LICENSE_TEXT_EN}`);
+    for (const u of s.urls) lines.push(`  Source URL: ${u}`);
   }
   lines.push('Processing:');
   lines.push(`- ${area.description.en}`);
@@ -109,8 +115,8 @@ export function buildCredit(
   for (const p of area.processing ?? []) lines.push(`- ${p.en}`);
   lines.push('This file was made by processing the data above with PLATEAUtoGLB.');
   lines.push('Show this attribution whenever you use the result, in any format (GLB, OBJ, STL) and also for 3D prints, images and videos.');
-  lines.push('This is not made by the Ministry of Land, Infrastructure, Transport and Tourism or any municipality.');
+  lines.push('This was not created by the Ministry of Land, Infrastructure, Transport and Tourism or any municipality.');
   lines.push(`Terms of use: ${SITE_POLICY_URL}`);
   lines.push(`Created: ${area.createdAt}`);
-  return { sources, short, text: lines.join('\n') + '\n' };
+  return { sources, short, shortEn, text: lines.join('\n') + '\n' };
 }
