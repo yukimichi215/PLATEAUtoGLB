@@ -55,7 +55,18 @@
 ### ブラウザ版
 
 ブラウザで動くアプリです（Windows 版はやめ、ブラウザ版に一本化しました）。作ったファイルはブラウザのダウンロードで保存します。
-Web での公開の方法は検討中です。それまでは、パソコンに Node.js を入れて次のように起動します。
+
+**公開先：https://yukimichi215.github.io/PLATEAUtoGLB/** （インストール不要。ブラウザで開くだけで使えます）
+
+main に取り込まれると、自動で GitHub Pages に公開されます（`.github/workflows/build.yml`）。
+
+最初の1回だけ、リポジトリの持ち主が GitHub の画面で次の設定をします：
+
+1. リポジトリを公開（Public）にする（無料プランの GitHub Pages は公開リポジトリだけで使えるため）
+2. リポジトリの **Settings → Pages** を開き、**Build and deployment** の **Source** を「**GitHub Actions**」にする
+3. main に何か取り込まれる（または Actions の画面で最後の main の実行を「Re-run」する）と公開される
+
+自分のパソコンで動かすときは、Node.js を入れて次のように起動します。
 
 ```sh
 npm ci --ignore-scripts
@@ -116,6 +127,6 @@ GLB の出力を変えたときは、さらに実データで `npm run cli` と 
 - `src/core/` … 画面とコマンドで共通の中身（場所→メッシュ番号、データカタログ、CityGML の読み取り、三角形分割、GLB 作成、OBJ・STL・zip の書き出し〔`export.ts`〕、3D プリンタ用の閉じた形〔`solid.ts`〕・縮尺と台座〔`print.ts`〕・1つの立体にまとめる計算〔`union.ts`。manifold-3d〕、出典）
 - `src/web/` … ブラウザの画面。重い処理は Web Worker（`worker.ts`）で行う
 - `scripts/` … コマンド（GLB 作成・検査）
-- `.github/workflows/build.yml` … 自動ビルド。PR と main で検査と画面のビルドができるかを確かめるだけ（できたファイルは保存しない）
+- `.github/workflows/build.yml` … 自動ビルドと公開。PR では検査と画面のビルドができるかを確かめるだけ（できたファイルは保存しない）。main に取り込まれたときは、同じ確認のあと GitHub Pages に公開する
 
-自動ビルド：PR と main で「検査（型チェック・テスト・画面のビルド）」が通ることを確かめる（できたファイルは保存しない）。
+自動ビルド：PR と main で「検査（型チェック・テスト・画面のビルド）」が通ることを確かめる。main のときだけ、そのあと公開用のファイルを作って GitHub Pages に公開する（保存する成果物は Pages 用の1つだけで、保存期間は1日。資料〔`.md`・`docs/`〕だけの変更では動かない。同じブランチに新しい push が来たら古い実行は止める。公式のアクションは版をコミットで固定）。画面は相対パスで作るので（`vite.config.ts` の `base: './'`）、`/PLATEAUtoGLB/` の下でもそのまま動く。
