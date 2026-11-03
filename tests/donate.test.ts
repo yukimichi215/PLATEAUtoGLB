@@ -8,9 +8,13 @@ const label = (l: Lang) => (s: 'ofuse' | 'githubSponsors') => t(s === 'ofuse' ? 
 const both = { ofuse: 'https://ofuse.me/example', githubSponsors: 'https://github.com/sponsors/example' };
 
 describe('寄付ボタン', () => {
-  it('URL が空なら出さない（同梱の設定は空）', () => {
+  it('URL が空なら出さない', () => {
     expect(donateLinks({ ofuse: '', githubSponsors: '' }, 'ja', label('ja'))).toEqual([]);
-    expect(donateLinks(DONATE_CONFIG, 'ja', label('ja'))).toEqual([]);
+  });
+
+  it('同梱の設定：OFUSE だけが入っていて、GitHub Sponsors はまだ空', () => {
+    expect(DONATE_CONFIG.ofuse).toBe('https://ofuse.me/yukimichi');
+    expect(donateLinks(DONATE_CONFIG, 'ja', label('ja')).map((l) => l.service)).toEqual(['ofuse']);
   });
 
   it('URL があるものだけを出す', () => {
