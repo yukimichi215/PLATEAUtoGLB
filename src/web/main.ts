@@ -9,6 +9,8 @@ import type { PrintOptions } from '../core/print.js';
 import { AreaMap, type AreaMode, type DrawState } from './area-map.js';
 import { situationEvidence, SITUATIONS, type Situation, type Text } from '../core/situation.js';
 import { Preview, type ViewName } from './preview.js';
+import { CityListView } from './city-list-view.js';
+import type { CityEntry } from './city-list.js';
 import { evidenceText } from './evidence-text.js';
 import { applyStatic, lang, onLangChange, setLang, t, type Lang } from './i18n/index.js';
 import { translateCore } from './i18n/core-messages.js';
@@ -351,6 +353,44 @@ function renderSituationPlaces(): void {
 }
 situationSelect.addEventListener('change', renderSituationPlaces);
 
+// 対応地域の一覧から探す：自治体は住所の検索で場所を調べ、LOD3 の場所はその区画の中心を選ぶ
+async function selectCity(c: CityEntry): Promise<void> {
+  const full = `${c.pref}${c.name}`;
+  setBusy(true);
+  showMessage(t('cities.searching', { city: full }));
+  try {
+    const places = await searchPlace(full, fetchJson);
+    if (places.length === 0) showMessage(t('search.notFound'), true);
+    else selectPlace(places[0]!, null, { ja: full, en: full });
+  } catch (e) {
+    showMessage(t('search.failed', { error: e instanceof Error ? e.message : String(e) }), true);
+  } finally {
+    setBusy(false);
+  }
+}
+
+const cityListView = new CityListView(
+  $('city-list-summary'),
+  $('city-count'),
+  $('city-source'),
+  $('city-groups'),
+  document.querySelectorAll<HTMLInputElement>('input[name="lod-filter"]'),
+  {
+    onCity: (c) => void selectCity(c),
+    onLod3Place: (c, p, i) => {
+      const title = (l: Lang) => t('cities.lod3Title', { city: `${c.pref}${c.name}`, i: i + 1 }, l);
+      selectPlace({ lat: p.lat, lon: p.lon, title: title('ja') }, null, { ja: title('ja'), en: title('en') });
+      // LOD3 を選んだので、建物の細かさも「窓・扉まで」にする（変えたことは知らせる）
+      const lod3 = document.querySelector<HTMLInputElement>('input[name="detail"][value="lod3"]');
+      if (lod3 && !lod3.checked) {
+        lod3.checked = true;
+        lod3.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      showMessage(t('cities.lod3Selected'));
+    },
+  },
+);
+
 /** できあがりに、選んだシチュエーションの根拠の数値を出す */
 function showEvidence(situation: Situation | null, character: GenerateStats['character']): void {
   evidenceEl.hidden = situation === null;
@@ -563,6 +603,7 @@ clearCacheBtn.addEventListener('click', async () => {
 // 言語の切り替え（最初はブラウザの言語。選んだものを覚える）
 function renderDynamicTexts(): void {
   renderSituationSelect();
+  cityListView.render();
   renderPlace();
   renderMapHint();
   renderCoverage();

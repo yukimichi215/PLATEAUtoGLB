@@ -13,7 +13,8 @@
     "test": "vitest run",
     "cli": "tsx scripts/cli.ts",
     "verify": "tsx scripts/verify-glb.ts",
-    "check-situations": "tsx scripts/check-situations.ts"
+    "check-situations": "tsx scripts/check-situations.ts",
+    "make-city-list": "tsx scripts/make-city-list.ts"
   },
   "dependencies": {
     "@gltf-transform/core": "^4.5.1",

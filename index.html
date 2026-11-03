@@ -38,6 +38,19 @@
           <p id="situation-note" class="hint"></p>
           <ul id="situation-places" class="candidates"></ul>
         </details>
+        <details class="situation city-list">
+          <summary id="city-list-summary"></summary>
+          <p class="hint" data-i18n="cities.lodHelp">LOD は建物の細かさの段階です。LOD1＝箱型、LOD2＝屋根の形あり、LOD3＝窓・扉まで（「建物の細かさ」の選び方と同じ）。一覧の自治体にはどこも箱型（LOD1）があります。LOD2 は自治体の中の一部の地区だけ、LOD3 は駅前など約1km 四方の区画が数か所だけのことが多いです。選んだあとは、地図の緑の枠でデータのある所を確かめられます。</p>
+          <fieldset class="lod-filter">
+            <legend data-i18n="cities.filter.legend">絞り込み</legend>
+            <label class="inline"><input type="radio" name="lod-filter" value="all" checked /> <span data-i18n="cities.filter.all">すべて</span></label>
+            <label class="inline"><input type="radio" name="lod-filter" value="lod2" /> <span data-i18n="cities.filter.lod2">LOD2（屋根の形）がある所だけ</span></label>
+            <label class="inline"><input type="radio" name="lod-filter" value="lod3" /> <span data-i18n="cities.filter.lod3">LOD3（窓・扉まで）がある所だけ</span></label>
+          </fieldset>
+          <p id="city-count" class="hint"></p>
+          <div id="city-groups" class="city-groups"></div>
+          <p id="city-source" class="hint"></p>
+        </details>
         <ul id="candidates" class="candidates" hidden></ul>
         <p id="place" class="place" hidden></p>
         <p id="coverage-note" class="hint coverage-note" role="status" hidden></p>

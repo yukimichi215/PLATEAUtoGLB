@@ -113,3 +113,17 @@ fieldset.use { margin-top: 12px; }
 /* PLATEAU の建物データがある所の枠の見本（area-map.ts の COVERAGE_STYLE と同じ色） */
 .coverage-swatch { display: inline-block; width: 12px; height: 12px; margin-right: 6px; vertical-align: -1px; border: 1px solid #2e7d32; background: rgba(67, 160, 71, 0.15); }
 .coverage-note.error { color: var(--error); font-weight: 600; }
+
+/* 対応地域の一覧 */
+.lod-filter { margin-top: 8px; display: grid; gap: 4px; }
+.city-groups { margin-top: 8px; display: grid; gap: 4px; }
+.city-groups details.pref { border: 1px solid var(--border); border-radius: 8px; padding: 4px 10px; }
+.city-groups details.pref > summary { cursor: pointer; padding: 6px 0; font-weight: 600; }
+.city-items { list-style: none; padding: 0; margin: 4px 0 8px; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; }
+.city-items > li:has(.lod3-places) { grid-column: 1 / -1; }
+.city-items button.city { width: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; text-align: left; }
+.lod-badge { font-size: .7rem; font-weight: 700; padding: 1px 5px; border-radius: 4px; border: 1px solid currentColor; line-height: 1.3; }
+.lod-badge.lod2 { color: var(--accent); }
+.lod-badge.lod3 { color: #b35900; }
+.lod3-places { list-style: none; padding: 0 0 0 16px; margin: 4px 0 0; display: grid; gap: 4px; }
+.lod3-places button { width: 100%; text-align: left; font-size: .9rem; }
