@@ -3,7 +3,7 @@ import { WebIO } from '@gltf-transform/core';
 import { describe, expect, it } from 'vitest';
 import type { SourceFile } from '../src/core/catalog.js';
 import { generateFromPlan, type AreaPlan, type AreaRequest, type OpenText } from '../src/core/pipeline.js';
-import { usageName } from '../src/core/usage.js';
+import { knownUsageCode, usageName } from '../src/core/usage.js';
 
 const openText: OpenText = async () =>
   createReadStream(new URL('./fixtures/bldg_tokyo_station.gml', import.meta.url), { encoding: 'utf8' }) as AsyncIterable<string>;
@@ -53,6 +53,8 @@ describe('建物の情報を部品に残す', () => {
       expect(extras.storeysAboveGround).toBe(info.storeys);
       expect(extras.yearOfConstruction).toBe(info.yearOfConstruction);
       expect(extras.usageName).toBe(usageName(info.usage));
+      expect(extras.usage).toBe(info.usage);
+      expect(extras.usage).not.toBe('461');
       // 名前のある建物は「名前_ID」
       expect(name).toBe(info.name ? `${info.name}_${info.buildingId ?? info.id}` : (info.buildingId ?? info.id));
       // データにない項目は作らない（値が undefined・空のキーがない）
@@ -82,6 +84,10 @@ describe('建物の情報を部品に残す', () => {
     expect(usageName('401')).toBe('業務施設');
     expect(usageName('431')).toBe('運輸倉庫施設');
     expect(usageName('461')).toBeUndefined();
+    expect(usageName('471')).toBe('空家');
+    expect(knownUsageCode('461')).toBeUndefined();
+    expect(knownUsageCode('999')).toBe('999');
+    expect(knownUsageCode('471')).toBe('471');
     expect(usageName('999')).toBeUndefined();
     expect(usageName(undefined)).toBeUndefined();
   });

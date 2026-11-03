@@ -20,10 +20,19 @@ const USAGE_NAMES: Record<string, string> = {
   '453': '防衛施設',
   '454': 'その他',
   '461': '不明',
+  '471': '空家',
 };
+
+/** 「不明」を表すコード（値なしとして扱う） */
+const UNKNOWN_USAGE = '461';
+
+/** 用途のコード。「不明」（461）だけは値なしにする。表にないコードはコードのまま残す（名前は付けない） */
+export function knownUsageCode(code: string | undefined): string | undefined {
+  return code === UNKNOWN_USAGE ? undefined : code;
+}
 
 /** 用途のコードの名前（知らないコード・「不明」は undefined） */
 export function usageName(code: string | undefined): string | undefined {
-  if (code === undefined || code === '461') return undefined;
-  return USAGE_NAMES[code];
+  const known = knownUsageCode(code);
+  return known === undefined ? undefined : USAGE_NAMES[known];
 }
