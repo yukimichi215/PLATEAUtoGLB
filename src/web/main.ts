@@ -6,6 +6,8 @@ import type { PrintOptions } from '../core/print.js';
 import { AreaMap, type AreaMode, type DrawState } from './area-map.js';
 import { situationEvidence, SITUATIONS, type Situation } from '../core/situation.js';
 import { Preview, type ViewName } from './preview.js';
+import { DONATE_CONFIG } from './donate-config.js';
+import { donateLinks, renderDonate } from './donate.js';
 import type { WorkerRequest, WorkerResponse } from './worker.js';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -454,6 +456,9 @@ makeBtn.addEventListener('click', async () => {
     setBusy(false);
   }
 });
+
+// 寄付（応援）ボタン
+renderDonate($('donate'), donateLinks(DONATE_CONFIG, document.documentElement.lang));
 
 // プレビューの見る向き
 for (const btn of document.querySelectorAll<HTMLButtonElement>('.view-buttons button')) {
