@@ -156,7 +156,7 @@ export const en: Record<MessageKey, string> = {
   'make.done': 'Done',
   'make.unexpected': 'Unexpected response',
 
-  'step4.title': 'Make the 3D model',
+  'step4.title': 'Make and save',
   'result.title': 'Result and saving',
   'preview.aria': '3D preview (drag to rotate, wheel to zoom)',
   'preview.grid': 'One grid square = {length}',
@@ -212,7 +212,7 @@ export const en: Record<MessageKey, string> = {
   'footer.privacy':
     'No personal information is collected (no analytics, ads or third-party tracking). Address searches send what you type to GSI, showing the map requests the map images for that spot from GSI, and making a model sends the area you chose to the PLATEAU data service. Your language choice and downloaded data are stored only on this device. The hosting service (GitHub Pages) may keep ordinary access logs (such as IP addresses).',
   'footer.warranty': 'Provided without warranty. The author is not responsible for the accuracy of the models or for any result of using them.',
-  'footer.more': 'Privacy and warranty',
+  'footer.more': 'About this tool (data sources, privacy, warranty)',
   'footer.licenses': 'Licenses of bundled software',
   'footer.clearCache': 'Delete PLATEAU data saved on this device',
   'cacheCleared': 'Deleted the saved PLATEAU data.',

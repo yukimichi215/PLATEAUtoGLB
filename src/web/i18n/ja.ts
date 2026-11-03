@@ -153,7 +153,7 @@ export const ja = {
   'make.done': '完成しました',
   'make.unexpected': '予期しない応答',
 
-  'step4.title': '3D モデルを作る',
+  'step4.title': '作成と保存',
   'result.title': 'できあがり・保存',
   'preview.aria': '3D プレビュー（ドラッグで回転・ホイールで拡大）',
   'preview.grid': 'マス目 1 つ = {length}',
@@ -208,7 +208,7 @@ export const ja = {
   'footer.privacy':
     '個人情報は集めません（アクセス解析・広告・外部の追跡は使っていません）。住所の検索では入力した文字が国土地理院に、地図を表示するときは表示する場所の地図の画像の要求が国土地理院に、3D モデルを作るときは選んだ場所の範囲が PLATEAU のデータ配信に送られます。選んだ言語と取得したデータは、この端末の中にだけ保存します。公開先（GitHub Pages）は、通常のアクセスの記録（IP アドレスなど）を残すことがあります。',
   'footer.warranty': '無保証です。作った 3D モデルの正確さや、使った結果について、作者は責任を負いません。',
-  'footer.more': '個人情報・保証について',
+  'footer.more': 'このツールについて（データの出典・個人情報・保証）',
   'footer.licenses': '使っている部品のライセンス',
   'footer.clearCache': '手元に保存した PLATEAU データを消す',
   'cacheCleared': '保存していた PLATEAU データを消しました。',

@@ -35,7 +35,7 @@ body {
 .top h1 { margin: 24px 0 4px; font-size: 1.6rem; }
 .top-row { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; }
 .top-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.lang-select { font-size: .85rem; padding: 2px 6px; }
+.lang-select { font-size: .85rem; padding: 2px 6px; min-height: 44px; }
 .donate { display: flex; flex-wrap: wrap; gap: 6px; }
 .donate-button { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border: 1px solid var(--muted); border-radius: 999px; color: var(--text); font-size: .8rem; text-decoration: none; }
 .donate-button:hover { border-color: var(--text); }
@@ -94,9 +94,14 @@ label.inline { display: flex; flex-direction: row; align-items: center; gap: 6px
 .situation label { display: flex; flex-direction: column; gap: 4px; }
 .situation-evidence { margin-top: 12px; padding: 8px 12px; border-left: 3px solid var(--muted); }
 .situation-evidence h3 { margin: 0 0 4px; font-size: 1rem; }
-.stats { display: grid; grid-template-columns: max-content 1fr; gap: 2px 16px; margin: 12px 0; }
+.stats { display: grid; grid-template-columns: minmax(0, max-content) minmax(0, 1fr); gap: 2px 16px; margin: 12px 0; }
 .stats dt { color: var(--muted); }
-.stats dd { margin: 0; }
+.stats dd { margin: 0; overflow-wrap: anywhere; }
+/* 狭い画面では、項目名の下に値を置く（横にはみ出さないように） */
+@media (max-width: 480px) {
+  .stats { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .stats dd { margin-bottom: 8px; }
+}
 pre { white-space: pre-wrap; word-break: break-all; font-size: .85rem; background: var(--bg); padding: 8px; border-radius: 8px; }
 footer { color: var(--muted); font-size: .85rem; padding-bottom: 32px; }
 [hidden] { display: none !important; }
@@ -161,7 +166,12 @@ details.panel[open] > summary { border-bottom: 1px solid var(--border); }
 .panel-body > * { margin: 0; }
 
 /* 畳んだ「詳しく」 */
-details.more > summary { cursor: pointer; color: var(--accent); font-size: .88rem; width: fit-content; }
+/* 指でも押しやすい高さ（44px） */
+details.more > summary { cursor: pointer; color: var(--accent); font-size: .88rem; width: fit-content; min-height: 44px; display: flex; align-items: center; }
+details.more > summary { list-style: none; }
+details.more > summary::-webkit-details-marker { display: none; }
+details.more > summary::before { content: '▸'; display: inline-block; width: 1.1em; }
+details.more[open] > summary::before { content: '▾'; }
 details.more > p { margin-top: 4px; }
 
 /* 選んだ場所 */
