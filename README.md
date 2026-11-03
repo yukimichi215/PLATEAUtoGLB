@@ -17,6 +17,7 @@
    - **3D プリンタ用**：縮尺（1/500〜1/10000、または台座の一辺の長さ〔mm〕）と台座の厚さ（mm。0 で台座なし）を決める。
      建物は屋根の面を真下に押し出した形に作り直し、道路（厚さ 0.4 mm の板）・台座と一緒に、穴やすき間のない1つの立体にまとめる
      （付属物・窓・扉は細かすぎて印刷できないので入れない。範囲からはみ出した部分は切り落とし、台座はちょうど切り出した正方形）
+     印刷するとこの太さ（mm。既定 0.8、0 で外さない）より細い建物・道路は外し、外した数を表示する
 4. 「3D モデルを作る」を押すと、必要な地域のデータだけを PLATEAU から取り、その場で 3D モデルにする
 5. 3D のプレビューで確かめて、形式を選んで保存
    - **GLB**：色付き・1ファイル（PlotBlock・Web 向け）。中に出典を書いてある
@@ -85,6 +86,7 @@ npm run dev
 | `npm run app:dev` / `npm run app:build` | Windows アプリ版の起動・ビルド（Rust と Tauri の準備が要る。通常は GitHub の自動ビルドで作る） |
 | `npm run cli -- … --print --scale 1000 --base-mm 3`（または `--fit-mm 100`） | 3D プリンタ用（縮尺・台座・閉じた形）で作る |
 | `npm run cli -- … --height-scale 1.5` | 建物の高さだけを 1.5 倍にする（1〜3） |
+| `npm run cli -- … --print --min-mm 0.8` | 3D プリンタ用で、印刷すると 0.8 mm より細い建物・道路を外す（0〜10。既定 0.8、0 で外さない） |
 | `npm run verify -- out/xxx.glb out/xxx.obj out/xxx.stl` | GLB を glTF Validator と three.js で、OBJ・STL を three.js の OBJLoader・STLLoader で検査し、外形・三角形の数を表示。STL は印刷できる形か（開いた辺・3つ以上の面が共有する辺・部品の数・体積が正か・台座から浮いた部品）も表示 |
 
 PR を出す前の検証：`npm run typecheck`、`npm test`、`npm run build` がすべて通ること。
