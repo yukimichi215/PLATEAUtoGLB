@@ -175,3 +175,112 @@ export function minWidth2d(pts: number[]): number {
   }
   return Number.isFinite(best) ? best : 0;
 }
+
+// ---- 多角形で囲んだ範囲（範囲の選び方。2次元 [x, z, x, z, ...]） ----
+
+/** 点 (x, z) が多角形の内側か（偶奇の規則） */
+export function pointInRing(x: number, z: number, ring: number[]): boolean {
+  let inside = false;
+  const n = ring.length / 2;
+  for (let i = 0, j = n - 1; i < n; j = i++) {
+    const xi = ring[i * 2]!, zi = ring[i * 2 + 1]!;
+    const xj = ring[j * 2]!, zj = ring[j * 2 + 1]!;
+    if (zi > z !== zj > z && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+/** 多角形の辺どうしが交わっていないか（となりの辺は除く）。交わっていれば囲んだ範囲として使えない */
+export function isSimpleRing(ring: number[]): boolean {
+  const n = ring.length / 2;
+  if (n < 3) return false;
+  const p = (i: number): [number, number] => [ring[(i % n) * 2]!, ring[(i % n) * 2 + 1]!];
+  const cross = (o: [number, number], a: [number, number], b: [number, number]) =>
+    (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      if (j === i + 1 || (i === 0 && j === n - 1)) continue; // となりの辺
+      const a = p(i), b = p(i + 1), c = p(j), d = p(j + 1);
+      const d1 = cross(c, d, a), d2 = cross(c, d, b), d3 = cross(a, b, c), d4 = cross(a, b, d);
+      if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) return false;
+    }
+  }
+  return true;
+}
+
+/** 凸多角形 clip（反時計回りでも時計回りでもよい）で、多角形 subject を切り取る（Sutherland–Hodgman 法） */
+function clipByConvex(subject: number[], clip: number[]): number[] {
+  // clip の向きをそろえる（内側が左になる向きに）
+  let area = 0;
+  const m = clip.length / 2;
+  for (let i = 0; i < m; i++) {
+    const j = (i + 1) % m;
+    area += clip[i * 2]! * clip[j * 2 + 1]! - clip[j * 2]! * clip[i * 2 + 1]!;
+  }
+  const s = area >= 0 ? 1 : -1;
+  let pts = subject;
+  for (let e = 0; e < m && pts.length >= 6; e++) {
+    const ax = clip[e * 2]!, az = clip[e * 2 + 1]!;
+    const bx = clip[((e + 1) % m) * 2]!, bz = clip[((e + 1) % m) * 2 + 1]!;
+    const side = (x: number, z: number) => s * ((bx - ax) * (z - az) - (bz - az) * (x - ax));
+    const out: number[] = [];
+    const n = pts.length / 2;
+    for (let i = 0; i < n; i++) {
+      const j = (i + 1) % n;
+      const xi = pts[i * 2]!, zi = pts[i * 2 + 1]!, xj = pts[j * 2]!, zj = pts[j * 2 + 1]!;
+      const si = side(xi, zi), sj = side(xj, zj);
+      if (si >= 0) out.push(xi, zi);
+      if ((si >= 0) !== (sj >= 0)) {
+        const t = si / (si - sj);
+        out.push(xi + t * (xj - xi), zi + t * (zj - zi));
+      }
+    }
+    pts = out;
+  }
+  return pts.length >= 6 ? pts : [];
+}
+
+/**
+ * 穴のある多角形（2次元）を、囲んだ範囲 ring（へこんでいてもよい）で切り取り、三角形の集まり（2次元の頂点と番号）にする。
+ * どちらも三角形に分けてから、三角形どうしで切り取る（凸どうしなら確実に切れるため）。
+ */
+export function clipPolygonByRing(exterior: number[], holes: number[][], ring: number[]): { points: number[]; indices: number[] } {
+  const points: number[] = [];
+  const indices: number[] = [];
+  const triangles = (ext: number[], hs: number[][]) => {
+    const flat = [...ext];
+    const starts: number[] = [];
+    for (const h of hs) {
+      starts.push(flat.length / 2);
+      flat.push(...h);
+    }
+    const idx = earcut(flat, starts.length > 0 ? starts : undefined, 2);
+    const out: number[][] = [];
+    for (let t = 0; t < idx.length; t += 3) {
+      out.push([0, 1, 2].flatMap((k) => [flat[idx[t + k]! * 2]!, flat[idx[t + k]! * 2 + 1]!]));
+    }
+    return out;
+  };
+  const bbox = (p: number[]) => {
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+    for (let i = 0; i < p.length; i += 2) {
+      x0 = Math.min(x0, p[i]!); x1 = Math.max(x1, p[i]!);
+      z0 = Math.min(z0, p[i + 1]!); z1 = Math.max(z1, p[i + 1]!);
+    }
+    return [x0, x1, z0, z1] as const;
+  };
+  const clips = triangles(ring, []).map((c) => ({ c, b: bbox(c) }));
+  for (const tri of triangles(exterior, holes)) {
+    const tb = bbox(tri);
+    for (const { c, b } of clips) {
+      if (tb[1] < b[0] || tb[0] > b[1] || tb[3] < b[2] || tb[2] > b[3]) continue;
+      const piece = clipByConvex(tri, c);
+      const n = piece.length / 2;
+      if (n < 3) continue;
+      const base = points.length / 2;
+      points.push(...piece);
+      for (let i = 1; i + 1 < n; i++) indices.push(base, base + i, base + i + 1);
+    }
+  }
+  return { points, indices };
+}

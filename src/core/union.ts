@@ -30,7 +30,7 @@ export type UnionResult<K extends string> = { positions: Float32Array; indices: 
 /**
  * 立体をすべて1つにまとめる。どの三角形がどの key（建物・道路・台座）から来たかは残す（色分けのため）。
  * 重なった部分は内側になって消え、接している面は1つにつながる。
- * clipHalf を指定すると範囲の外を切り落とす（切り口も閉じた面になる）。
+ * clip（閉じた形）を指定すると、その外を切り落とす（切り口も閉じた面になる）。
  * 体積が minVolume より小さいかけら（計算の誤差でできる薄い殻）は除き、tolerance 以内の細かな凹凸はならす。
  */
 export async function unionSolids<K extends string>(
@@ -38,40 +38,40 @@ export async function unionSolids<K extends string>(
   {
     minVolume = 0,
     tolerance = 0,
-    clipHalf,
+    clip,
   }: {
     minVolume?: number;
     tolerance?: number;
-    /** 指定すると、上から見て [-clipHalf, clipHalf] の正方形の外を切り落とす */
-    clipHalf?: number;
+    /** 指定すると、この閉じた形（範囲の柱）の外を切り落とす */
+    clip?: Solid;
   } = {},
 ): Promise<UnionResult<K>> {
   const m = await manifold();
   const toDelete: { delete(): void }[] = [];
   try {
+    let clipCache: InstanceType<typeof m.Manifold> | null = null;
+    const toManifold = (s: Solid) => {
+      const mesh = new m.Mesh({
+        numProp: 3,
+        vertProperties: Float32Array.from(s.positions),
+        triVerts: Uint32Array.from(s.indices),
+      });
+      mesh.merge();
+      const man = new m.Manifold(mesh);
+      toDelete.push(man);
+      return man;
+    };
+    const clipManifold = () => (clipCache ??= toManifold(clip!));
     const idToKey = new Map<number, K>();
     const parts = [];
     for (const g of groups) {
       if (g.solids.length === 0) continue;
-      const pieces = g.solids.map((s) => {
-        const mesh = new m.Mesh({
-          numProp: 3,
-          vertProperties: Float32Array.from(s.positions),
-          triVerts: Uint32Array.from(s.indices),
-        });
-        mesh.merge();
-        const man = new m.Manifold(mesh);
-        toDelete.push(man);
-        return man;
-      });
+      const pieces = g.solids.map(toManifold);
       let joined = m.Manifold.union(pieces);
       toDelete.push(joined);
-      if (clipHalf !== undefined) {
-        // 範囲の正方形の柱（高さは十分に大きく）と重なる部分だけ残す。切り口の面もこの key の色にする
-        const h = clipHalf;
-        const clipBox = m.Manifold.cube([2 * h, 2e5, 2 * h], true);
-        toDelete.push(clipBox);
-        joined = joined.intersect(clipBox);
+      if (clip) {
+        // 範囲の柱（高さは十分に大きく）と重なる部分だけ残す。切り口の面もこの key の色にする
+        joined = joined.intersect(clipManifold());
         toDelete.push(joined);
       }
       joined = joined.asOriginal();

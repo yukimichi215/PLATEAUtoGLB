@@ -7,7 +7,7 @@ import { pipeline as streamPipeline } from 'node:stream/promises';
 import { parseArgs } from 'node:util';
 import type { SourceFile } from '../src/core/catalog.js';
 import { parseFormats } from '../src/core/export.js';
-import { defaultFetchJson, generateFromPlan, planArea, type OpenText } from '../src/core/pipeline.js';
+import { areaOfPolygon, defaultFetchJson, generateFromPlan, planArea, type OpenText } from '../src/core/pipeline.js';
 
 const { values } = parseArgs({
   options: {
@@ -37,11 +37,24 @@ const { values } = parseArgs({
     /** 建物の高さだけを何倍にするか（1〜3） */
     'height-scale': { type: 'string', default: '1' },
     separate: { type: 'boolean', default: false },
+    polygon: { type: 'string' },
   },
 });
 
-if (!values.lat || !values.lon) {
-  console.error('使い方: npm run cli -- --lat <緯度> --lon <経度> [--size 300] [--lod 1|2|3] [--installations] [--format glb,obj,stl] [--print [--scale 1000 | --fit-mm 100] [--base-mm 3] [--min-mm 0.8]] [--height-scale 1.5] [--separate] [--name 名前]');
+// 囲んだ範囲：「緯度,経度;緯度,経度;…」（3点以上）。指定したときは --lat・--lon・--size はいらない
+const polygon = values.polygon
+  ? values.polygon.split(';').filter((s) => s.trim() !== '').map((s) => {
+      const [lat, lon] = s.split(',').map(Number);
+      return { lat: lat!, lon: lon! };
+    })
+  : undefined;
+if (polygon?.some((p) => !Number.isFinite(p.lat) || !Number.isFinite(p.lon))) {
+  console.error('--polygon は「緯度,経度;緯度,経度;…」の形で書いてください');
+  process.exit(1);
+}
+
+if (!polygon && (!values.lat || !values.lon)) {
+  console.error('使い方: npm run cli -- --lat <緯度> --lon <経度> [--size 300]（または --polygon "緯度,経度;緯度,経度;…"） [--lod 1|2|3] [--installations] [--format glb,obj,stl] [--print [--scale 1000 | --fit-mm 100] [--base-mm 3] [--min-mm 0.8]] [--height-scale 1.5] [--separate] [--name 名前]');
   process.exit(1);
 }
 
@@ -104,9 +117,10 @@ const openText: OpenText = async (file: SourceFile, onBytes) => {
   return gen();
 };
 
+const area = polygon ? areaOfPolygon(polygon) : { center: { lat: Number(values.lat), lon: Number(values.lon) }, size: Number(values.size) };
 const req = {
-  center: { lat: Number(values.lat), lon: Number(values.lon) },
-  size: Number(values.size),
+  ...area,
+  polygon,
   lod: (values.lod === '3' ? 3 : values.lod === '2' ? 2 : 1) as 1 | 2 | 3,
   installations: values.installations,
   includeRoads: !values['no-roads'],

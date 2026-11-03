@@ -1,7 +1,9 @@
 // 画面の操作。重い処理は worker.ts に任せる。
+import { areaOfPolygon, MAX_SIZE } from '../core/area.js';
 import { searchPlace, type Place } from '../core/geocode.js';
 import type { AreaPlan, AreaRequest, DownloadKind } from '../core/pipeline.js';
 import type { PrintOptions } from '../core/print.js';
+import { AreaMap, type AreaMode, type DrawState } from './area-map.js';
 import { Preview } from './preview.js';
 import type { WorkerRequest, WorkerResponse } from './worker.js';
 
@@ -40,6 +42,13 @@ const dlLinks = Object.fromEntries(
   DOWNLOAD_KINDS.map((k) => [k, $<HTMLAnchorElement>(`dl-${k}`)]),
 ) as Record<DownloadKind, HTMLAnchorElement>;
 const clearCacheBtn = $<HTMLButtonElement>('clear-cache');
+const sizeLabel = $<HTMLLabelElement>('size-label');
+const mapWrap = $<HTMLDivElement>('map-wrap');
+const mapNeedPlace = $<HTMLParagraphElement>('map-need-place');
+const mapTools = $<HTMLDivElement>('map-tools');
+const mapUndo = $<HTMLButtonElement>('map-undo');
+const mapFinish = $<HTMLButtonElement>('map-finish');
+const mapHint = $<HTMLParagraphElement>('map-hint');
 
 /** 取得量がこれを超えるときは、作る前に確認する（MB） */
 const CONFIRM_MB = 300;
@@ -47,6 +56,9 @@ const CONFIRM_MB = 300;
 let selected: Place | null = null;
 let busy = false;
 let preview: Preview | null = null;
+/** 範囲を選ぶ地図（場所を選んだときに作る。それまでは地図のタイルを読み込まない） */
+let areaMap: AreaMap | null = null;
+let draw: DrawState = { mode: 'square', drawingPoints: 0 };
 const objectUrls: string[] = [];
 
 const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });
@@ -73,9 +85,16 @@ function showMessage(text: string, isError = false): void {
   messageEl.classList.toggle('error', isError);
 }
 
+/** 作れる状態か（場所を選んでいて、地図で囲むときは問題なく囲み終えている） */
+function canMake(): boolean {
+  if (!selected) return false;
+  if (draw.mode === 'square') return true;
+  return draw.polygon !== undefined && draw.issue === undefined;
+}
+
 function setBusy(b: boolean): void {
   busy = b;
-  makeBtn.disabled = b || !selected;
+  makeBtn.disabled = b || !canMake();
   searchBtn.disabled = b;
 }
 
@@ -88,9 +107,57 @@ function selectPlace(p: Place): void {
   candidatesEl.hidden = true;
   placeEl.hidden = false;
   placeEl.textContent = `選んだ場所：${p.title}（緯度 ${p.lat.toFixed(5)}・経度 ${p.lon.toFixed(5)}）`;
-  makeBtn.disabled = busy;
+  mapWrap.hidden = false;
+  mapNeedPlace.hidden = true;
+  areaMap ??= new AreaMap($('map'), onDrawChange);
+  areaMap.setMode(currentAreaMode());
+  areaMap.show({ lat: p.lat, lon: p.lon }, Number(sizeEl.value));
+  setBusy(busy);
   showMessage('');
 }
+
+const currentAreaMode = () =>
+  (document.querySelector<HTMLInputElement>('input[name="area"]:checked')?.value ?? 'square') as AreaMode;
+
+/** 地図で描いた範囲が変わったとき：説明・ボタン・印刷の大きさの目安を更新する */
+function onDrawChange(s: DrawState): void {
+  draw = s;
+  const drawing = s.mode !== 'square';
+  sizeLabel.hidden = drawing;
+  mapTools.hidden = !drawing;
+  mapUndo.hidden = s.mode !== 'polygon';
+  mapFinish.hidden = s.mode !== 'polygon';
+  mapUndo.disabled = s.drawingPoints === 0;
+  mapFinish.disabled = s.drawingPoints < 3;
+  mapHint.classList.toggle('error', s.issue !== undefined);
+  mapHint.textContent = drawHint(s);
+  setBusy(busy);
+  updatePrintUi();
+}
+
+function drawHint(s: DrawState): string {
+  if (s.issue === 'crossing') return '線が交差しています。「描き直す」で、線が交差しないように囲み直してください。';
+  if (s.issue === 'tooLarge') return `囲んだ範囲が大きすぎます（一辺 ${MAX_SIZE} m の正方形に入る大きさまで。今は約 ${s.size} m）。`;
+  if (s.polygon) return `囲んだ範囲：一辺 約 ${s.size} m の正方形に入る大きさ（${s.polygon.length} 点）。描き直すときは「描き直す」を押します。`;
+  if (s.mode === 'rect') return '地図の上で、押したまま動かして四角を描きます（このあいだ地図はドラッグで動かせません。拡大・縮小はホイール・2本指・＋−で）。';
+  if (s.mode === 'polygon') {
+    return s.drawingPoints === 0
+      ? '地図を押して、囲む形の角に点を打ちます。最初の点をもう一度押すか「囲み終える」で閉じます。'
+      : `点 ${s.drawingPoints} 個。続けて点を打つか、最初の点を押す・「囲み終える」で閉じます（3点以上）。`;
+  }
+  return '地図の青い四角が切り出す範囲です。広さは下で選べます。';
+}
+
+for (const el of document.querySelectorAll<HTMLInputElement>('input[name="area"]')) {
+  el.addEventListener('change', () => {
+    if (areaMap) areaMap.setMode(currentAreaMode());
+    else onDrawChange({ mode: currentAreaMode(), drawingPoints: 0 });
+  });
+}
+mapUndo.addEventListener('click', () => areaMap?.undoPoint());
+mapFinish.addEventListener('click', () => areaMap?.finishPolygon());
+$<HTMLButtonElement>('map-clear').addEventListener('click', () => areaMap?.clearDrawing());
+sizeEl.addEventListener('change', () => areaMap?.setSize(Number(sizeEl.value)));
 
 async function fetchJson(url: string): Promise<unknown> {
   const res = await fetch(url);
@@ -157,12 +224,14 @@ function updatePrintUi(): void {
   for (const el of document.querySelectorAll<HTMLElement>('.print-same')) el.hidden = !print;
   overhangHint.hidden = print;
   if (!print) return;
-  const size = Number(sizeEl.value);
+  const size = currentSize();
   const p = currentPrint()!;
   const side = p.fitSideMm ?? (size * 1000) / p.scaleDenominator!;
   const scale = p.fitSideMm ? `（縮尺 約 1/${Math.round((size * 1000) / p.fitSideMm)}）` : '';
   printHintEl.textContent =
-    `印刷したときの台座の大きさ：約 ${side.toFixed(0)} × ${side.toFixed(0)} mm${scale}。` +
+    (draw.mode !== 'square' && draw.polygon
+      ? `印刷したときの台座の大きさ：囲んだ形（約 ${side.toFixed(0)} × ${side.toFixed(0)} mm の四角に入る大きさ）${scale}。`
+      : `印刷したときの台座の大きさ：約 ${side.toFixed(0)} × ${side.toFixed(0)} mm${scale}。`) +
     'OBJ・STL はミリメートル、STL は印刷ソフトに合わせて上が +Z です。' +
     '建物は屋根の面を真下に押し出した、穴のない形に作り直します（付属物・窓は入れず、範囲からはみ出した部分は切り落とします。台座が地面の代わりになります）。';
 }
@@ -172,11 +241,19 @@ for (const el of [...document.querySelectorAll('input[name="use"]'), scaleEl, fi
 }
 updatePrintUi();
 
+/** 切り出す正方形の一辺（地図で囲んだときは、囲んだ範囲がちょうど入る正方形） */
+function currentSize(): number {
+  return draw.mode !== 'square' && draw.size !== undefined ? draw.size : Number(sizeEl.value);
+}
+
 function currentRequest(): AreaRequest {
   const detail = document.querySelector<HTMLInputElement>('input[name="detail"]:checked')?.value ?? 'box';
+  const area =
+    draw.mode !== 'square' && draw.polygon
+      ? { ...areaOfPolygon(draw.polygon), polygon: draw.polygon }
+      : { center: { lat: selected!.lat, lon: selected!.lon }, size: Number(sizeEl.value) };
   return {
-    center: { lat: selected!.lat, lon: selected!.lon },
-    size: Number(sizeEl.value),
+    ...area,
     lod: detail === 'box' ? 1 : detail === 'lod3' ? 3 : 2,
     // 窓・扉まで（LOD3）にも付属物を入れる。LOD3 のない建物は「屋根の形＋付属物」で代わりに作るので、それより粗くならない
     installations: detail === 'roofPlus' || detail === 'lod3',
@@ -204,7 +281,7 @@ function addStat(label: string, value: string): void {
 }
 
 makeBtn.addEventListener('click', async () => {
-  if (!selected || busy) return;
+  if (!canMake() || busy) return;
   setBusy(true);
   showMessage('');
   setProgress(0, 'この場所の PLATEAU データを調べています…');
@@ -248,6 +325,9 @@ makeBtn.addEventListener('click', async () => {
     const s = res.stats;
     statsEl.replaceChildren();
     addStat('建物', `${s.buildings.toLocaleString()} 棟`);
+    if (plan.request.polygon) {
+      addStat('範囲', `地図で囲んだ形（${plan.request.polygon.length} 点。一辺 約 ${plan.request.size} m の正方形に入る大きさ）`);
+    }
     if (plan.request.separateBuildings && !s.print) addStat('部品の分け方', `建物を1棟ずつ（${s.buildings.toLocaleString()} 個）＋道路・地面`);
     if (plan.request.installations) {
       addStat(

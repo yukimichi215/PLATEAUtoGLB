@@ -1,7 +1,8 @@
 // 建物・道路を、切り出した範囲の中心を原点にした三角形の集まりにする。
 import type { Building, Lod3Kind, Polygon, Road } from './citygml.js';
 import { LocalProjector } from './geo.js';
-import { clipRingToSquare, triangulatePolygon } from './geometry.js';
+import earcut from 'earcut';
+import { clipPolygonByRing, clipRingToSquare, pointInRing, triangulatePolygon } from './geometry.js';
 import { extrudeDown, footprintArea, MIN_FOOTPRINT_M2, type Solid } from './solid.js';
 import { usageName } from './usage.js';
 
@@ -98,6 +99,11 @@ export interface SceneOptions {
   heightScale?: number;
   /** 建物を1棟ずつ別の部品にする（編集ソフトで1棟ずつ選べるように）。閉じた形（solid）のときは使えない */
   separate?: boolean;
+  /**
+   * 囲んだ範囲（ローカル座標の多角形 [x, z, x, z, ...]。上から見て正方形 half の中）。
+   * 指定すると、中心がこの中にある建物だけを入れ、道路・地面はこの形で切る。指定しないときは正方形 half
+   */
+  clip?: number[];
 }
 
 export interface BuildingInfo {
@@ -297,6 +303,7 @@ export class SceneBuilder {
     }
     const [cx, cz] = this.opt.projector.toXZ(sumLat / n, sumLon / n);
     if (Math.abs(cx) > this.opt.half || Math.abs(cz) > this.opt.half) return false;
+    if (this.opt.clip && !pointInRing(cx, cz, this.opt.clip)) return false;
     this.seen.add(b.id);
 
     const useLod3 = this.opt.lod === 3 && b.lod3.length > 0;
@@ -484,6 +491,17 @@ export class SceneBuilder {
         }
         return out;
       };
+      if (this.opt.clip) {
+        // 囲んだ範囲（へこんでいてもよい）で切り取る。囲んだ形にかからない道路は入れない（本数にも数えない）。
+        // 3Dプリンタ用は、下で切らない板を作り、あとで立体として切り落とす
+        const cut = clipPolygonByRing(toXZ(p.exterior), p.interiors.map(toXZ), this.opt.clip);
+        if (cut.indices.length === 0) continue;
+        if (!this.opt.solid) {
+          this.addUpward(this.parts.road, cut.points, cut.indices, ROAD_HEIGHT);
+          added = true;
+          continue;
+        }
+      }
       const ext = clipRingToSquare(toXZ(p.exterior), this.opt.half);
       if (ext.length < 6) continue;
       const holes = p.interiors
@@ -532,8 +550,34 @@ export class SceneBuilder {
     return added;
   }
 
+  /** 囲んだ範囲（3Dプリンタ用で台座・切り落としに使う）。指定がなければ undefined */
+  get clipRing(): number[] | undefined {
+    return this.opt.clip;
+  }
+
+  /** 平らな三角形（2次元の頂点 [x, z, ...]）を高さ y に置き、上向きにそろえて足す */
+  private addUpward(part: MeshPart, points: number[], indices: ArrayLike<number>, y: number): void {
+    const positions: number[] = [];
+    for (let i = 0; i < points.length; i += 2) positions.push(points[i]!, y, points[i + 1]!);
+    const idx = Array.from(indices);
+    for (let t = 0; t < idx.length; t += 3) {
+      const a = idx[t]!, b = idx[t + 1]!, c = idx[t + 2]!;
+      // 上から見た向き（+Y を向くなら正）。逆なら並びを入れ替える
+      const cy = (points[b * 2 + 1]! - points[a * 2 + 1]!) * (points[c * 2]! - points[a * 2]!) -
+        (points[b * 2]! - points[a * 2]!) * (points[c * 2 + 1]! - points[a * 2 + 1]!);
+      if (cy < 0) [idx[t + 1], idx[t + 2]] = [c, b];
+    }
+    part.addTriangles(positions, idx, [0, 1, 0]);
+  }
+
   /** 範囲全体に、薄い地面の板（2枚の三角形）を敷く */
   addGround(): void {
+    if (this.opt.clip) {
+      // 囲んだ範囲の形の地面
+      const ring = this.opt.clip;
+      this.addUpward(this.parts.ground, ring, earcut(ring, undefined, 2), 0);
+      return;
+    }
     const h = this.opt.half;
     this.parts.ground.addTriangles(
       [-h, 0, -h, -h, 0, h, h, 0, h, h, 0, -h],
