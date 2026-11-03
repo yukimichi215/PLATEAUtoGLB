@@ -3,7 +3,8 @@
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { areaOfPolygon, dedupePolygon, polygonIssue, type PolygonIssue } from '../core/area.js';
-import { LocalProjector, type LatLon } from '../core/geo.js';
+import type { CoverageCell } from '../core/coverage.js';
+import { LocalProjector, type LatLon, type LatLonBox } from '../core/geo.js';
 import { MAP_TILES } from './map-config.js';
 
 /** 範囲の選び方。square：中心と一辺の正方形、rect：地図で四角を描く、polygon：地図で自由な形を描く */
@@ -22,6 +23,8 @@ export interface DrawState {
 }
 
 const STYLE: L.PathOptions = { color: '#1f6feb', weight: 2, fillOpacity: 0.12 };
+/** PLATEAU の建物データがある所（3次メッシュ）の枠 */
+const COVERAGE_STYLE: L.PathOptions = { color: '#2e7d32', weight: 1, opacity: 0.6, fillColor: '#43a047', fillOpacity: 0.08, interactive: false };
 const BAD_STYLE: L.PathOptions = { color: '#c62828', weight: 2, fillOpacity: 0.12 };
 /** 最初の点のこの距離（画面の px）の中をクリックすると、囲み終える */
 const CLOSE_PX = 14;
@@ -31,6 +34,9 @@ const SAME_POINT_PX = 6;
 export class AreaMap {
   private map: L.Map;
   private layer = L.layerGroup();
+  /** データのある所の枠（描いた範囲より下に出す） */
+  private coverageLayer = L.layerGroup();
+  private viewListener: ((view: LatLonBox) => void) | null = null;
   private mode: AreaMode = 'square';
   private center: LatLon | null = null;
   private size = 300;
@@ -51,7 +57,9 @@ export class AreaMap {
       minZoom: MAP_TILES.minZoom,
       maxZoom: MAP_TILES.maxZoom,
     }).addTo(this.map);
+    this.coverageLayer.addTo(this.map);
     this.layer.addTo(this.map);
+    this.map.on('moveend', () => this.viewListener?.(this.view()));
     this.setAttributionLabel(attributionLabel);
     this.map.on('click', (ev: L.LeafletMouseEvent) => this.onClick(ev));
     // 四角は、押したまま動かして描く（指でも描けるように pointer の出来事を使う）
@@ -74,6 +82,31 @@ export class AreaMap {
     if (this.attribution) control.removeAttribution(this.attribution);
     control.addAttribution(html);
     this.attribution = html;
+  }
+
+  /** 今地図に見えている範囲 */
+  view(): LatLonBox {
+    const b = this.map.getBounds();
+    return { south: b.getSouth(), west: b.getWest(), north: b.getNorth(), east: b.getEast() };
+  }
+
+  /** 地図を動かしたとき（見える範囲が変わったとき）に呼ぶ関数 */
+  onViewChange(fn: (view: LatLonBox) => void): void {
+    this.viewListener = fn;
+  }
+
+  /** データのある所の枠を出す（null で消す） */
+  setCoverage(cells: CoverageCell[] | null): void {
+    this.coverageLayer.clearLayers();
+    for (const c of cells ?? []) {
+      L.rectangle(
+        [
+          [c.box.south, c.box.west],
+          [c.box.north, c.box.east],
+        ],
+        COVERAGE_STYLE,
+      ).addTo(this.coverageLayer);
+    }
   }
 
   /** 選んだ場所を中心に地図を出す（正方形の一辺 m） */

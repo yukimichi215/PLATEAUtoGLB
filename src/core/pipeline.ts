@@ -1,6 +1,6 @@
 // 「場所と広さ → 必要なファイルを調べる → 読む → GLB にする」の流れ。
 // 画面（ブラウザ）からもコマンド（Node.js）からも同じものを使う。
-import { findSourceFiles, type FeatureType, type FetchJson, type SourceFile } from './catalog.js';
+import { fetchCatalogJson, findSourceFiles, type FeatureType, type FetchJson, type SourceFile } from './catalog.js';
 import { readCityGml } from './citygml.js';
 import { buildCredit, LICENSE_TEXT, type UsedFile } from './credit.js';
 import { LocalProjector, meshCodesForBox, type LatLon } from './geo.js';
@@ -451,11 +451,8 @@ export function downloadFiles(result: GenerateResult): Record<DownloadKind, Down
 }
 
 /** 標準の fetch を使って JSON を取る */
-export const defaultFetchJson: FetchJson = async (url) => {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`PLATEAU データカタログへの問い合わせに失敗しました（${res.status}）`);
-  return res.json();
-};
+/** データのない場所（404）は空の答えとして扱う（catalog.ts の fetchCatalogJson） */
+export const defaultFetchJson: FetchJson = fetchCatalogJson;
 
 /** Response の本文を、文字列の流れにする（読んだバイト数を知らせる） */
 export async function* responseText(res: Response, onBytes: (n: number) => void): AsyncIterable<string> {

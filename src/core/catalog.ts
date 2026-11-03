@@ -35,6 +35,16 @@ interface CatalogResponse {
 
 export type FetchJson = (url: string) => Promise<unknown>;
 
+/**
+ * データカタログ API に問い合わせる。データのない場所（メッシュ）は 404 が返るので、空の答え（自治体なし）として扱う。
+ */
+export const fetchCatalogJson: FetchJson = async (url) => {
+  const res = await fetch(url);
+  if (res.status === 404) return { cities: [] };
+  if (!res.ok) throw new Error(`PLATEAU データカタログへの問い合わせに失敗しました（${res.status}）`);
+  return res.json();
+};
+
 export function catalogUrl(mesh: string, types: FeatureType[]): string {
   return `${CATALOG_API}/m:${mesh}?types=${types.join(',')}`;
 }
