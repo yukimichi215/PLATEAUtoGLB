@@ -32,7 +32,7 @@ export const en: Record<MessageKey, string> = {
   'situation.label': 'Situation',
   'situation.choose': 'Choose one',
   'situation.group.station': 'Around a station',
-  'situation.group.genre': 'Story genre',
+  'situation.group.town': 'Townscape',
   'situation.note':
     'Rule of thumb: {approximation}. The candidates below are not judgements of any town; they are examples whose data (age, structure, etc.) is close. Pick a candidate and make the model to see the supporting numbers (an approximation from building attributes).',
   'situation.place': '{name}: {note}',

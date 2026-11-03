@@ -1,7 +1,8 @@
-// シチュエーション検索：「都会の駅前」や作品のジャンル（古い木造の町並みなど）から、向いた地域の候補を出す。
+// シチュエーション検索：「都会の駅前」や町並み（古い木造の町並みなど）から、向いた地域の候補を出す。
 // 候補の地域は手で選んだ一覧。選んだ地域が本当に向いているかは、切り出した建物の属性
 // （建てた年・構造・用途・高さ・建物の密度）から出した「根拠の数値」で示す。
-// 町の雰囲気（「ほのぼの」など）は PLATEAU のデータにないので、属性での近似であることを画面に出す。
+// 町の雰囲気（「静かな」など）は PLATEAU のデータにないので、属性での近似であることを画面に出す。
+// 作品のジャンル（ホラーなど）の名前は付けない（建物の細かさが足りず、ジャンル向けとしては機能しないため。2026-11-03 利用者）。
 // 一般に公開するので、実在の町を悪く言う名前・説明にしない（候補は「データ上の特徴が近い例」として出す）。
 import type { LatLon } from './geo.js';
 
@@ -158,8 +159,8 @@ export interface SituationPlace extends LatLon {
 
 export interface Situation {
   id: string;
-  /** 'station'：駅前の雰囲気、'genre'：作品のジャンル */
-  kind: 'station' | 'genre';
+  /** 'station'：駅前の雰囲気、'town'：町並み */
+  kind: 'station' | 'town';
   label: Text;
   /** どの属性で近似するか（画面に出す） */
   approximation: Text;
@@ -216,8 +217,8 @@ export const SITUATIONS: Situation[] = [
   },
   {
     id: 'horror',
-    kind: 'genre',
-    label: { ja: '古い木造の町並み（ホラー・時代もの向き）', en: 'Old wooden townscape (for horror and period pieces)' },
+    kind: 'town',
+    label: { ja: '古い木造の町並み', en: 'Old wooden townscape' },
     approximation: { ja: '古い建物と木造の建物が多い所', en: 'many old and wooden buildings' },
     metrics: ['old', 'wooden', 'avgHeight'],
     places: [
@@ -228,8 +229,8 @@ export const SITUATIONS: Situation[] = [
   },
   {
     id: 'calm-residential',
-    kind: 'genre',
-    label: { ja: 'ほのぼの（静かな住宅街）', en: 'Slice of life (quiet residential area)' },
+    kind: 'town',
+    label: { ja: '静かな住宅街', en: 'Quiet residential area' },
     approximation: { ja: '住宅が多く、低い建物が中心の所', en: 'mostly houses and low buildings' },
     metrics: ['residential', 'avgHeight', 'tall31', 'density'],
     places: [
@@ -240,8 +241,8 @@ export const SITUATIONS: Situation[] = [
   },
   {
     id: 'futuristic',
-    kind: 'genre',
-    label: { ja: '近未来（高層ビル街）', en: 'Near future (high-rise district)' },
+    kind: 'town',
+    label: { ja: '高層ビル街', en: 'High-rise district' },
     approximation: { ja: '超高層ビルと、新しい建物の多さで近似', en: 'approximated by high-rises and the share of new buildings' },
     metrics: ['tall60', 'avgHeight', 'new', 'tall31'],
     places: [

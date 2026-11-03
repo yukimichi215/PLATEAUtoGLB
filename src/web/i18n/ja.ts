@@ -30,7 +30,7 @@ export const ja = {
   'situation.label': 'シチュエーション',
   'situation.choose': '選んでください',
   'situation.group.station': '駅前の雰囲気',
-  'situation.group.genre': '作品のジャンル',
+  'situation.group.town': '町並み',
   'situation.note': '目安：{approximation}。下の候補は、特定の町の評価ではなく、データ上の特徴（古さ・構造など）が近い例です。候補を選んで作ると、できあがりに根拠の数値（建物の属性から出した近似）を出します。',
   'situation.place': '{name}：{note}',
   'evidence.title': '「{label}」に向いているかの目安',

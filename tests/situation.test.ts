@@ -139,7 +139,7 @@ describe('シチュエーション検索の根拠の数値', () => {
       const ev = situationEvidence(s, areaCharacter([], 90000));
       expect(ev.map((e) => e.metric)).toEqual(s.metrics);
     }
-    // 駅前3種類と、ジャンル（ホラー・ほのぼの・近未来）
+    // 駅前3種類と、町並み（古い木造の町並み・静かな住宅街・高層ビル街）
     expect([...ids]).toEqual(['city-station', 'regional-station', 'rural-station', 'horror', 'calm-residential', 'futuristic']);
   });
 });
