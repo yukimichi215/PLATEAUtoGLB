@@ -70,9 +70,9 @@ describe('建物ごとに部品を分ける', () => {
       expect(objReport.ok).toBe(true);
       expect(objReport.objects.length).toBe(n + 2);
       expect(objReport.triangles).toBe(a.triangles);
-      // 名前は建物の一覧（buildings.json）の ID から付ける
+      // 名前は建物の一覧（buildings.json）の ID から付ける（名前のある建物は「名前_ID」）
       for (const [i, info] of sep.buildings.entries()) {
-        expect(buildingNames[i]!.startsWith(info.buildingId ?? info.id)).toBe(true);
+        expect(buildingNames[i]!).toContain(info.buildingId ?? info.id);
       }
       // STL は部品の区別がないので、同じ三角形の数の1つの形
       expect(checkMesh('stl', sep.stl).triangles).toBe(a.triangles);

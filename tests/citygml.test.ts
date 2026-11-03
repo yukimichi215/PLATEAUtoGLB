@@ -47,6 +47,27 @@ describe('CityGML の読み取り', () => {
     expect(got[0]!.attrs.storeysAboveGround).toBe(3);
   });
 
+  it('「分からない」を表す値（階数 9999・建てた年 0001・高さ -9999）は値なしにする', () => {
+    const xml = (storeys: string, year: string, height: string) => `<core:CityModel><core:cityObjectMember><bldg:Building gml:id="b1">
+<bldg:measuredHeight uom="m">${height}</bldg:measuredHeight>
+<bldg:storeysAboveGround>${storeys}</bldg:storeysAboveGround>
+<bldg:yearOfConstruction>${year}</bldg:yearOfConstruction>
+</bldg:Building></core:cityObjectMember></core:CityModel>`;
+    const read = (text: string) => {
+      const got: Building[] = [];
+      const reader = new CityGmlReader({ onBuilding: (b) => got.push(b) });
+      reader.feed(text);
+      reader.close();
+      return got[0]!.attrs;
+    };
+    const unknown = read(xml('9999', '0001', '-9999'));
+    expect(unknown.storeysAboveGround).toBeUndefined();
+    expect(unknown.yearOfConstruction).toBeUndefined();
+    expect(unknown.measuredHeight).toBeUndefined();
+    const known = read(xml('5', '1985', '18.4'));
+    expect(known).toMatchObject({ storeysAboveGround: 5, yearOfConstruction: 1985, measuredHeight: 18.4 });
+  });
+
   it('LOD3（窓・扉まである形）を読む：窓・扉は種類を分け、窓の名前は建物の名前にしない', async () => {
     const list: Building[] = [];
     await readCityGml(fixture('bldg_numazu_lod3.gml'), { onBuilding: (b) => list.push(b) });

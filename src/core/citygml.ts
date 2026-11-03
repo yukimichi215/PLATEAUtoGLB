@@ -78,6 +78,18 @@ const NUMERIC_ATTRS = new Set<keyof BuildingAttributes>([
   'yearOfConstruction',
 ]);
 
+/**
+ * PLATEAU で「分からない」を表す値（階数 9999、建てた年 0001、高さ -9999 など）は、値なしとして扱う
+ * （データにない項目を、本当の値のように見せないため）
+ */
+function isKnownNumber(key: keyof BuildingAttributes, n: number): boolean {
+  if (!Number.isFinite(n)) return false;
+  if (key === 'storeysAboveGround') return n >= 0 && n < 9999;
+  if (key === 'yearOfConstruction') return n > 1000 && n < 9999;
+  if (key === 'measuredHeight') return n > 0 && n < 9999;
+  return true;
+}
+
 function parseNumbers(text: string): number[] {
   const parts = text.trim().split(/\s+/);
   const out: number[] = [];
@@ -291,7 +303,7 @@ export class CityGmlReader {
       if (raw !== '' && this.building.attrs[key] === undefined) {
         if (NUMERIC_ATTRS.has(key)) {
           const n = Number(raw);
-          if (Number.isFinite(n)) (this.building.attrs as Record<string, unknown>)[key] = n;
+          if (isKnownNumber(key, n)) (this.building.attrs as Record<string, unknown>)[key] = n;
         } else {
           (this.building.attrs as Record<string, unknown>)[key] = raw;
         }
