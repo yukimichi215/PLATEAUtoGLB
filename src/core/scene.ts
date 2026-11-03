@@ -491,13 +491,16 @@ export class SceneBuilder {
         }
         return out;
       };
-      if (this.opt.clip && !this.opt.solid) {
-        // 囲んだ範囲（へこんでいてもよい）で切り取る
+      if (this.opt.clip) {
+        // 囲んだ範囲（へこんでいてもよい）で切り取る。囲んだ形にかからない道路は入れない（本数にも数えない）。
+        // 3Dプリンタ用は、下で切らない板を作り、あとで立体として切り落とす
         const cut = clipPolygonByRing(toXZ(p.exterior), p.interiors.map(toXZ), this.opt.clip);
         if (cut.indices.length === 0) continue;
-        this.addUpward(this.parts.road, cut.points, cut.indices, ROAD_HEIGHT);
-        added = true;
-        continue;
+        if (!this.opt.solid) {
+          this.addUpward(this.parts.road, cut.points, cut.indices, ROAD_HEIGHT);
+          added = true;
+          continue;
+        }
       }
       const ext = clipRingToSquare(toXZ(p.exterior), this.opt.half);
       if (ext.length < 6) continue;

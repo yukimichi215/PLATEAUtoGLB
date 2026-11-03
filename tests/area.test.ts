@@ -153,6 +153,17 @@ describe('範囲を囲んで切り出す', () => {
     expect(res.stats.print!.depthMm).toBe(300);
   });
 
+  it('3D プリンタ用でも、囲んだ形にかからない道路は数えない', async () => {
+    // 北東側の三角形。見本の西の道路（x ≈ -165 m）は、ちょうど入る正方形（一辺 400 m）の中だが、三角形の外
+    const tri = [[-200, -200], [200, -200], [200, 200]];
+    const print = { scaleDenominator: 1000, baseMm: 2, minFeatureMm: 0 };
+    const model = await generateFromPlan(plan(polygonReq(tri)), openText);
+    const printed = await generateFromPlan(plan({ ...polygonReq(tri), print }), openText);
+    const square = await generateFromPlan(plan({ ...polygonReq(tri), polygon: undefined, print }), openText);
+    expect(square.stats.roads).toBeGreaterThan(printed.stats.roads);
+    expect(printed.stats.roads).toBe(model.stats.roads);
+  });
+
   it('囲み方の誤りを知らせる', () => {
     const base = { center: CENTER, size: 300, lod: 1 as const, includeRoads: true, includeGround: true };
     expect(() => validateRequest({ ...base, polygon: toLatLon([[0, 0], [10, 0]]) })).toThrow('3点以上');
