@@ -26,8 +26,24 @@
 
       <section class="card" aria-labelledby="h-settings">
         <h2 id="h-settings"><span class="step">2</span>切り出し方を選ぶ</h2>
+        <fieldset class="area-mode">
+          <legend>範囲の選び方</legend>
+          <label class="inline"><input type="radio" name="area" value="square" checked /> 正方形（選んだ場所が中心）</label>
+          <label class="inline"><input type="radio" name="area" value="rect" /> 地図で四角に囲む</label>
+          <label class="inline"><input type="radio" name="area" value="polygon" /> 地図で自由な形に囲む</label>
+        </fieldset>
+        <p id="map-need-place" class="hint">地図は、手順 1 で場所を選ぶと出ます。</p>
+        <div id="map-wrap" class="map-wrap" hidden>
+          <div id="map" class="map" aria-label="範囲を選ぶ地図"></div>
+          <div id="map-tools" class="row map-tools" hidden>
+            <button type="button" id="map-undo">1つ戻す</button>
+            <button type="button" id="map-finish">囲み終える</button>
+            <button type="button" id="map-clear">描き直す</button>
+          </div>
+          <p id="map-hint" class="hint"></p>
+        </div>
         <div class="grid">
-          <label>切り出す広さ（正方形の一辺）
+          <label id="size-label">切り出す広さ（正方形の一辺）
             <select id="size">
               <option value="50">50 m（建物数棟）</option>
               <option value="100">100 m</option>

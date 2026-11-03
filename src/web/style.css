@@ -84,3 +84,9 @@ footer { color: var(--muted); font-size: .85rem; padding-bottom: 32px; }
 [hidden] { display: none !important; }
 fieldset.use { margin-top: 12px; }
 .print-options, .model-options { margin-top: 12px; }
+
+.area-mode { margin-bottom: 8px; }
+.map-wrap { margin-bottom: 12px; }
+.map { height: 360px; border-radius: 8px; border: 1px solid var(--border); }
+.map.drawing { cursor: crosshair; user-select: none; -webkit-user-select: none; }
+.map-tools { margin-top: 8px; }
