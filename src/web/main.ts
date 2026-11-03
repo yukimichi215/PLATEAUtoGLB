@@ -4,7 +4,7 @@ import { searchPlace, type Place } from '../core/geocode.js';
 import type { AreaPlan, AreaRequest, DownloadKind } from '../core/pipeline.js';
 import type { PrintOptions } from '../core/print.js';
 import { AreaMap, type AreaMode, type DrawState } from './area-map.js';
-import { Preview } from './preview.js';
+import { Preview, type ViewName } from './preview.js';
 import type { WorkerRequest, WorkerResponse } from './worker.js';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -374,7 +374,7 @@ makeBtn.addEventListener('click', async () => {
     }
     resultEl.hidden = false;
     preview ??= new Preview($('preview'));
-    await preview.show(res.glb);
+    await preview.show(res.glb, { print: s.print !== undefined });
     resultEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
   } catch (e) {
     showMessage(e instanceof Error ? e.message : String(e), true);
@@ -383,6 +383,11 @@ makeBtn.addEventListener('click', async () => {
     setBusy(false);
   }
 });
+
+// プレビューの見る向き
+for (const btn of document.querySelectorAll<HTMLButtonElement>('.view-buttons button')) {
+  btn.addEventListener('click', () => preview?.setView(btn.dataset.view as ViewName));
+}
 
 clearCacheBtn.addEventListener('click', async () => {
   await call({ type: 'clearCache' });

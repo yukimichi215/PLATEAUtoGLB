@@ -75,7 +75,9 @@ label.inline { display: flex; flex-direction: row; align-items: center; gap: 6px
 #progress-fill { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
 .message { margin: 8px 0 0; white-space: pre-wrap; }
 .message.error { color: var(--error); }
-.preview { width: 100%; aspect-ratio: 16 / 10; background: var(--preview-bg); border-radius: 8px; overflow: hidden; touch-action: none; }
+.preview { position: relative; width: 100%; aspect-ratio: 16 / 10; background: var(--preview-bg); border-radius: 8px; overflow: hidden; touch-action: none; }
+.preview-scale { position: absolute; left: 8px; bottom: 8px; padding: 2px 8px; border-radius: 6px; background: var(--card); color: var(--text); font-size: .8rem; opacity: .85; pointer-events: none; }
+.view-buttons { margin-top: 8px; }
 .stats { display: grid; grid-template-columns: max-content 1fr; gap: 2px 16px; margin: 12px 0; }
 .stats dt { color: var(--muted); }
 .stats dd { margin: 0; }
