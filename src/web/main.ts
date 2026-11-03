@@ -1,9 +1,10 @@
 // 画面の操作。重い処理は worker.ts に任せる。
 import { areaOfPolygon, MAX_SIZE } from '../core/area.js';
 import { searchPlace, type Place } from '../core/geocode.js';
-import type { AreaPlan, AreaRequest, DownloadKind } from '../core/pipeline.js';
+import type { AreaPlan, AreaRequest, DownloadKind, GenerateStats } from '../core/pipeline.js';
 import type { PrintOptions } from '../core/print.js';
 import { AreaMap, type AreaMode, type DrawState } from './area-map.js';
+import { situationEvidence, SITUATIONS, type Situation } from '../core/situation.js';
 import { Preview, type ViewName } from './preview.js';
 import type { WorkerRequest, WorkerResponse } from './worker.js';
 
@@ -49,11 +50,20 @@ const mapTools = $<HTMLDivElement>('map-tools');
 const mapUndo = $<HTMLButtonElement>('map-undo');
 const mapFinish = $<HTMLButtonElement>('map-finish');
 const mapHint = $<HTMLParagraphElement>('map-hint');
+const situationSelect = $<HTMLSelectElement>('situation-select');
+const situationNote = $<HTMLParagraphElement>('situation-note');
+const situationPlaces = $<HTMLUListElement>('situation-places');
+const evidenceEl = $<HTMLDivElement>('situation-evidence');
+const evidenceTitle = $<HTMLHeadingElement>('situation-evidence-title');
+const evidenceNote = $<HTMLParagraphElement>('situation-evidence-note');
+const evidenceList = $<HTMLDListElement>('situation-evidence-list');
 
 /** 取得量がこれを超えるときは、作る前に確認する（MB） */
 const CONFIRM_MB = 300;
 
 let selected: Place | null = null;
+/** シチュエーションの候補から選んだときの、そのシチュエーション（住所の検索で選んだときはなし） */
+let selectedSituation: Situation | null = null;
 let busy = false;
 let preview: Preview | null = null;
 /** 範囲を選ぶ地図（場所を選んだときに作る。それまでは地図のタイルを読み込まない） */
@@ -102,8 +112,9 @@ function mb(bytes: number): string {
   return bytes >= 1e6 ? `${(bytes / 1e6).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1e3))} KB`;
 }
 
-function selectPlace(p: Place): void {
+function selectPlace(p: Place, situation: Situation | null = null): void {
   selected = p;
+  selectedSituation = situation;
   candidatesEl.hidden = true;
   placeEl.hidden = false;
   placeEl.textContent = `選んだ場所：${p.title}（緯度 ${p.lat.toFixed(5)}・経度 ${p.lon.toFixed(5)}）`;
@@ -203,6 +214,62 @@ searchForm.addEventListener('submit', async (ev) => {
   }
 });
 
+// シチュエーションから探す：条件を選ぶと、向いた地域の候補（手で選んだ見本）を出す
+const SITUATION_GROUPS = [
+  { kind: 'station', label: '駅前の雰囲気' },
+  { kind: 'genre', label: '作品のジャンル' },
+] as const;
+{
+  const none = document.createElement('option');
+  none.value = '';
+  none.textContent = '選んでください';
+  situationSelect.append(none);
+  for (const g of SITUATION_GROUPS) {
+    const group = document.createElement('optgroup');
+    group.label = g.label;
+    for (const s of SITUATIONS.filter((x) => x.kind === g.kind)) {
+      const o = document.createElement('option');
+      o.value = s.id;
+      o.textContent = s.label;
+      group.append(o);
+    }
+    situationSelect.append(group);
+  }
+}
+situationSelect.addEventListener('change', () => {
+  const s = SITUATIONS.find((x) => x.id === situationSelect.value);
+  situationPlaces.replaceChildren();
+  situationNote.textContent = s
+    ? `目安：${s.approximation}。候補を選んで作ると、できあがりに根拠の数値（建物の属性から出した近似）を出します。`
+    : '';
+  if (!s) return;
+  for (const p of s.places) {
+    const li = document.createElement('li');
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = `${p.name}：${p.note}`;
+    b.addEventListener('click', () => selectPlace({ lat: p.lat, lon: p.lon, title: p.name }, s));
+    li.appendChild(b);
+    situationPlaces.appendChild(li);
+  }
+});
+
+/** できあがりに、選んだシチュエーションの根拠の数値を出す */
+function showEvidence(situation: Situation | null, character: GenerateStats['character']): void {
+  evidenceEl.hidden = situation === null;
+  evidenceList.replaceChildren();
+  if (!situation) return;
+  evidenceTitle.textContent = `「${situation.label}」に向いているかの目安`;
+  evidenceNote.textContent = `PLATEAU の建物の属性から出した近似です（${situation.approximation}）。データにない性質（「さびれた」など）そのものは分かりません。`;
+  for (const e of situationEvidence(situation, character)) {
+    const dt = document.createElement('dt');
+    dt.textContent = e.label;
+    const dd = document.createElement('dd');
+    dd.textContent = e.value;
+    evidenceList.append(dt, dd);
+  }
+}
+
 const isPrint = () => document.querySelector<HTMLInputElement>('input[name="use"]:checked')?.value === 'print';
 
 function currentPrint(): PrintOptions | undefined {
@@ -289,6 +356,8 @@ makeBtn.addEventListener('click', async () => {
   setBusy(true);
   showMessage('');
   setProgress(0, 'この場所の PLATEAU データを調べています…');
+  // 作り始めたときの場所がシチュエーションの候補なら、できあがりに根拠の数値を出す
+  const situationOfRequest = selectedSituation;
   try {
     const planRes = await call({ type: 'plan', req: currentRequest() });
     if (planRes.type !== 'plan') throw new Error('予期しない応答');
@@ -372,6 +441,7 @@ makeBtn.addEventListener('click', async () => {
     } else {
       addStat('外形（幅×奥行き×高さ）', `${s.width} × ${s.depth} × ${s.height} m`);
     }
+    showEvidence(situationOfRequest, s.character);
     resultEl.hidden = false;
     preview ??= new Preview($('preview'));
     await preview.show(res.glb, { print: s.print !== undefined });

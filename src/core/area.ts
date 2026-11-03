@@ -102,3 +102,9 @@ export function dedupePolygon(points: LatLon[], min = 0.5): LatLon[] {
   }
   return keep.map((i) => points[i]!);
 }
+
+/** 範囲の面積（m²）。囲んだ形があればその形の面積、なければ一辺 size の正方形 */
+export function areaM2(size: number, polygon?: LatLon[]): number {
+  if (!polygon || polygon.length < 3) return size * size;
+  return ringArea(localRingOf(polygon, areaOfPolygon(polygon).center));
+}

@@ -1,12 +1,13 @@
 # テスト用データの出典
 
-自動テストで使う、PLATEAU の3D都市モデルの小さな切り出しです（建物8棟・道路3本、合計 約0.9MB）。
+自動テストで使う、PLATEAU の3D都市モデルの小さな切り出しです（建物38棟・道路3本、合計 約1.5MB）。
 
 | ファイル | 内容 |
 |---|---|
 | `bldg_tokyo_station.gml` | 建築物モデル。東京駅の周り（3次メッシュ 53394611）の建物6棟だけを残したもの |
 | `tran_sample.gml` | 道路モデル。同じメッシュの道路3本だけを残したもの |
 | `bldg_numazu_lod3.gml` | 建築物モデル。沼津駅南口（3次メッシュ 52385628）の、窓・扉まである建物（LOD3）2棟だけを残したもの |
+| `bldg_kanazawa_attrs.gml` | 建築物モデル。金沢駅の東側（3次メッシュ 54366592）の、構造の種類（木造など）が入った建物30棟だけを残したもの（シチュエーション検索の根拠の数値のテスト用） |
 
 - 出典：「3D都市モデル（Project PLATEAU）千代田区（2025年度）」（国土交通省）を加工して作成
   - 東京都の整備データのため、同じファイルが中央区（2025年度）の配布にも含まれています
@@ -29,3 +30,14 @@
   - https://assets.cms.plateau.reearth.io/assets/c1/c24461-af1d-49a3-a4f4-14e88a731bfb/22203_numazu-shi_city_2023_citygml_3_op/udx/bldg/52385628_bldg_6697_op.gml
 - 入手日：2026-11-02
 - 加工の内容：ファイルの先頭部分（名前空間の宣言・範囲）を残し、`core:cityObjectMember` のうち建物2棟（`bldg_4776724a-…`・`bldg_74a2820d-…`）だけを残した。見た目の情報（`app:appearanceMember`）は削除。中身の数値は変えていない。
+
+## `bldg_kanazawa_attrs.gml`
+
+- 出典：「3D都市モデル（Project PLATEAU）金沢市（2024年度）」（国土交通省）を加工して作成
+- 自治体：石川県金沢市
+- 年度：2024年度
+- ライセンス：公共データ利用規約（第1.0版）（CC BY 4.0 互換）。利用条件：https://www.mlit.go.jp/plateau/site-policy/
+- 入手先（PLATEAU データカタログ API で取得した公式の個別ファイル）：
+  - https://assets.cms.plateau.reearth.io/assets/d9/61e6e9-e5c4-4235-a95c-e2220ae66b6b/17201_kanazawa-shi_city_2024_citygml_1_op/udx/bldg/54366592_bldg_6697_op.gml
+- 入手日：2026-11-03（手元に保存していたものから切り出し）
+- 加工の内容：ファイルの先頭部分（名前空間の宣言・範囲）を残し、`core:cityObjectMember` のうち、201 番目以降で `uro:buildingStructureType` を持つ最初の30棟だけを残した。中身の数値は変えていない。

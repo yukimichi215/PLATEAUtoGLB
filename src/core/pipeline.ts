@@ -6,8 +6,9 @@ import { buildCredit, LICENSE_TEXT, type UsedFile } from './credit.js';
 import { LocalProjector, meshCodesForBox, type LatLon } from './geo.js';
 import { makeZip, stlHeader, toMtl, toObj, toStl } from './export.js';
 import { buildGlb, GROUPS } from './glb.js';
-import { localRingOf, MAX_SIZE, meshCodesForPolygon, MIN_SIZE, polygonIssue } from './area.js';
+import { areaM2, localRingOf, MAX_SIZE, meshCodesForPolygon, MIN_SIZE, polygonIssue } from './area.js';
 import { finishForPrint, ROAD_PRINT_MM, scalePieces, validatePrint, type PrintInfo, type PrintOptions } from './print.js';
+import { areaCharacter, type AreaCharacter } from './situation.js';
 import { SceneBuilder, type BuildingInfo, type MeshPart, type ModelPiece } from './scene.js';
 
 export { areaOfPolygon, MAX_SIZE, MIN_SIZE } from './area.js';
@@ -132,6 +133,8 @@ export interface GenerateStats {
   print?: PrintInfo;
   /** 利用者に知らせたい注意（できあがりに出す） */
   warnings: string[];
+  /** 入れた建物の特徴（建物の密度・高さ・建てた年・構造・用途。シチュエーション検索の根拠） */
+  character: AreaCharacter;
 }
 
 export interface GenerateResult {
@@ -357,6 +360,8 @@ export async function generateFromPlan(
       },
       print,
       warnings,
+      // 建物の密度は、囲んだ形のときはその形の面積で割る
+      character: areaCharacter(scene.buildings, areaM2(req.size, req.polygon)),
     },
   };
 }

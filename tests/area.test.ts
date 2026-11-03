@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { checkMesh } from '../scripts/lib/check-mesh.js';
 import type { SourceFile } from '../src/core/catalog.js';
 import { LocalProjector, meshBox, meshCode3, meshCodesForBox, metersPerDegree, type LatLon } from '../src/core/geo.js';
-import { dedupePolygon, meshCodesForPolygon, polygonBox, polygonIssue } from '../src/core/area.js';
+import { areaM2, dedupePolygon, meshCodesForPolygon, polygonBox, polygonIssue } from '../src/core/area.js';
 import { clipPolygonByRing, isSimpleRing, pointInRing } from '../src/core/geometry.js';
 import { areaOfPolygon, generateFromPlan, validateRequest, type AreaPlan, type AreaRequest, type OpenText } from '../src/core/pipeline.js';
 
@@ -94,6 +94,11 @@ describe('囲んだ範囲の計算', () => {
     expect(all.length).toBe(4);
     expect(used.length).toBe(3);
     expect(used).not.toContain(meshCode3(c.lat + 0.001, c.lon + 0.001)); // 北東
+  });
+
+  it('範囲の面積（囲んだ形はその形の面積）', () => {
+    expect(areaM2(300)).toBe(90000);
+    expect(areaM2(300, toLatLon(L))).toBeCloseTo(300 * 300 - 150 * 115, -1);
   });
 
   it('囲んだ形では、形の緯度経度の範囲にかかるメッシュだけを取る（正方形の余白の分は取らない）', () => {

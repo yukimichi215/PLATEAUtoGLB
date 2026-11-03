@@ -25,6 +25,8 @@ export interface BuildingAttributes {
   buildingId?: string;
   /** 建物が属する自治体コード（uro:city） */
   city?: string;
+  /** 構造の種類のコード（uro:buildingStructureType。601 = 木造・土蔵造 など。自治体によってはない） */
+  structureType?: string;
 }
 
 export interface Building {
@@ -71,6 +73,7 @@ const ATTR_TAGS: Record<string, keyof BuildingAttributes> = {
   'gml:name': 'name',
   'uro:buildingID': 'buildingId',
   'uro:city': 'city',
+  'uro:buildingStructureType': 'structureType',
 };
 const NUMERIC_ATTRS = new Set<keyof BuildingAttributes>([
   'measuredHeight',

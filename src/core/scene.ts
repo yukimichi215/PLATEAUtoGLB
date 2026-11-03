@@ -118,6 +118,8 @@ export interface BuildingInfo {
   modelHeight: number;
   storeys?: number;
   yearOfConstruction?: number;
+  /** 構造の種類のコード（601 = 木造・土蔵造 など。データにないときはなし） */
+  structureType?: string;
   name?: string;
   city?: string;
   /** 中心から見た位置（m） */
@@ -419,6 +421,7 @@ export class SceneBuilder {
       modelHeight: Math.round(height * 100) / 100,
       storeys: b.attrs.storeysAboveGround,
       yearOfConstruction: b.attrs.yearOfConstruction,
+      structureType: b.attrs.structureType,
       name: b.attrs.name,
       city: b.attrs.city,
       x: Math.round(cx * 10) / 10,

@@ -20,6 +20,14 @@
           <button type="submit" id="search-btn">検索</button>
         </form>
         <p class="hint">住所・地名・駅名のほか、「緯度, 経度」でも指定できます。</p>
+        <details class="situation">
+          <summary>シチュエーションから探す（都会の駅前・ホラー向きの古い町並み など）</summary>
+          <label>シチュエーション
+            <select id="situation-select"></select>
+          </label>
+          <p id="situation-note" class="hint"></p>
+          <ul id="situation-places" class="candidates"></ul>
+        </details>
         <ul id="candidates" class="candidates" hidden></ul>
         <p id="place" class="place" hidden></p>
       </section>
@@ -135,6 +143,11 @@
           <button type="button" data-view="front">正面（南）から</button>
         </div>
         <p class="hint">ドラッグで回転、右ドラッグ（2本指）で移動、ホイール（ピンチ）で拡大・縮小できます。保存する前に、選んだ縮尺・台座・高さの強調がどう出るかをここで確かめられます。</p>
+        <div id="situation-evidence" class="situation-evidence" hidden>
+          <h3 id="situation-evidence-title"></h3>
+          <p id="situation-evidence-note" class="hint"></p>
+          <dl id="situation-evidence-list" class="stats"></dl>
+        </div>
         <dl id="stats" class="stats"></dl>
         <div class="row">
           <a id="dl-glb" class="button primary" download>GLB を保存</a>
