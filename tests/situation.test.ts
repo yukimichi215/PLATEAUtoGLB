@@ -109,6 +109,40 @@ describe('シチュエーション検索の根拠の数値', () => {
     }
   });
 
+  it('四角（横・縦）で切り出したとき、出典の文に横・縦の長さを書く', async () => {
+    const list: Building[] = [];
+    await readCityGml(fixture(KANAZAWA), { onBuilding: (b) => list.push(b) });
+    const lat = list.reduce((s, b) => s + b.lod1[0]!.exterior[0]!, 0) / list.length;
+    const lon = list.reduce((s, b) => s + b.lod1[0]!.exterior[1]!, 0) / list.length;
+    const m = metersPerDegree(lat);
+    const dLat = 100 / m.lat; // 縦 200 m
+    const dLon = 250 / m.lon; // 横 500 m
+    const polygon = [
+      { lat: lat - dLat, lon: lon - dLon },
+      { lat: lat - dLat, lon: lon + dLon },
+      { lat: lat + dLat, lon: lon + dLon },
+      { lat: lat + dLat, lon: lon - dLon },
+    ];
+    const file: SourceFile = {
+      type: 'bldg',
+      mesh: '54366592',
+      url: 'https://assets.cms.plateau.reearth.io/test/17201/udx/bldg/54366592_bldg_6697_op.gml',
+      fileSize: 1000,
+      maxLod: 1,
+      cities: [{ code: '17201', name: '金沢市', year: 2024, url: 'https://assets.cms.plateau.reearth.io/test/17201/bldg.gml' }],
+    };
+    const plan: AreaPlan = {
+      request: { center: { lat, lon }, size: 500, lod: 1, includeRoads: false, includeGround: false, placeName: '金沢', polygon, rect: { width: 500, height: 200 } },
+      meshes: ['54366592'],
+      files: [file],
+      totalBytes: 1000,
+      unknownSizeFiles: 0,
+    };
+    const res = await generateFromPlan(plan, async () => fixture(KANAZAWA));
+    expect(res.credit).toContain('横 500 m × 縦 200 m の四角');
+    expect(res.credit).toContain('500 m (east–west) × 200 m (north–south) rectangle');
+  });
+
   it('条件ごとに見本の地域が3つ以上あり、根拠の数値を大事な順に出す', () => {
     const ids = new Set<string>();
     for (const s of SITUATIONS) {

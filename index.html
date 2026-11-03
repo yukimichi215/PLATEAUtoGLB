@@ -72,7 +72,7 @@
         <fieldset class="segmented area-mode">
           <legend data-i18n="area.legend">範囲の選び方</legend>
           <label><input type="radio" name="area" value="square" checked /> <span data-i18n="area.square">正方形（選んだ場所が中心）</span></label>
-          <label><input type="radio" name="area" value="rect" /> <span data-i18n="area.rect">地図で四角に囲む</span></label>
+          <label><input type="radio" name="area" value="rect" /> <span data-i18n="area.rect">四角（横・縦を選ぶ）</span></label>
           <label><input type="radio" name="area" value="polygon" /> <span data-i18n="area.polygon">地図で自由な形に囲む</span></label>
         </fieldset>
         <p id="map-need-place" class="hint empty-note" data-i18n="map.needPlace">地図は、手順 1 で場所を選ぶと出ます。</p>
@@ -86,8 +86,19 @@
           <p id="map-hint" class="hint"></p>
           <p class="hint map-legend"><span class="coverage-swatch" aria-hidden="true"></span><span id="map-legend"></span></p>
         </div>
-        <label id="size-label" class="field"><span class="field-label" data-i18n="size.label">切り出す広さ（正方形の一辺）</span>
+        <label id="size-label" class="field"><span id="size-label-text" class="field-label" data-i18n="size.label">切り出す広さ（正方形の一辺）</span>
           <select id="size">
+            <option value="50" data-i18n="size.50">50 m（建物数棟）</option>
+            <option value="100" data-i18n="size.m" data-i18n-n="100">100 m</option>
+            <option value="150" data-i18n="size.m" data-i18n-n="150">150 m</option>
+            <option value="200" data-i18n="size.m" data-i18n-n="200">200 m</option>
+            <option value="300" data-i18n="size.m" data-i18n-n="300" selected>300 m</option>
+            <option value="500" data-i18n="size.m" data-i18n-n="500">500 m</option>
+            <option value="1000" data-i18n="size.1000">1000 m（重い）</option>
+          </select>
+        </label>
+        <label id="size-h-label" class="field" hidden><span class="field-label" data-i18n="size.height">縦の長さ（南北）</span>
+          <select id="size-h">
             <option value="50" data-i18n="size.50">50 m（建物数棟）</option>
             <option value="100" data-i18n="size.m" data-i18n-n="100">100 m</option>
             <option value="150" data-i18n="size.m" data-i18n-n="150">150 m</option>
