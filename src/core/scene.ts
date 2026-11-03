@@ -122,6 +122,8 @@ export interface BuildingInfo {
   structureType?: string;
   name?: string;
   city?: string;
+  /** 上から見た建物の大きさ（建築面積に近い値、m²）。シチュエーションの根拠の数値に使う */
+  footprintM2: number;
   /** 中心から見た位置（m） */
   x: number;
   z: number;
@@ -424,11 +426,23 @@ export class SceneBuilder {
       structureType: b.attrs.structureType,
       name: b.attrs.name,
       city: b.attrs.city,
+      footprintM2: Math.round(this.footprintOf(b)),
       x: Math.round(cx * 10) / 10,
       z: Math.round(cz * 10) / 10,
       lodUsed,
       installationFaces,
     });
+  }
+
+  /**
+   * 上から見た建物の大きさ（m²）。閉じた形は、上を向いた面と下を向いた面を真上から見た広さが同じなので、
+   * すべての面を真上から見た広さの合計の半分にする（面の表裏の向きがそろっていなくても数えられる）。
+   */
+  private footprintOf(b: Building): number {
+    const faces = b.lod1.length > 0 ? b.lod1 : b.lod2.map((s) => s.polygon);
+    let sum = 0;
+    for (const p of faces) sum += footprintArea(this.toLocal(p.exterior));
+    return sum / 2;
   }
 
   /**
