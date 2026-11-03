@@ -1,7 +1,7 @@
 # PLATEAUtoGLB
 
 住所や地名を入れると、その周りの建物（と道路）を、国土交通省の [PLATEAU（3D都市モデル）](https://www.mlit.go.jp/plateau/) から切り出して、
-[PlotBlock](https://github.com/yukimichi215/plot-block) で取り込める GLB ファイルにするツールです。ブラウザで使います。
+3D モデル（GLB・OBJ・STL）にするツールです。3D プリンタ・Blender などの編集ソフト・[PlotBlock](https://github.com/yukimichi215/plot-block) などで使えます。
 
 ## できること（初版）
 
@@ -11,16 +11,22 @@
    - **屋根の形あり**（LOD2）：屋根の形が入る。少し重い
    - **屋根の形＋付属物**（LOD2）：ベランダ・ひさし・屋上の設備なども入る。重い（データのない地域もある）
    - 道路・地面の板を入れるかどうか
-3. 「GLB を作る」を押すと、必要な地域のデータだけを PLATEAU から取り、その場で GLB にする
-4. 3D のプレビューで確かめて、GLB と出典（クレジット）の文章をダウンロード
+3. 「3D モデルを作る」を押すと、必要な地域のデータだけを PLATEAU から取り、その場で 3D モデルにする
+4. 3D のプレビューで確かめて、形式を選んで保存
+   - **GLB**：色付き・1ファイル（PlotBlock・Web 向け）。中に出典を書いてある
+   - **OBJ**：色付き（Blender などの編集ソフト向け）。`.obj`・色の設定 `.mtl`・出典の文章を zip にまとめて保存
+   - **STL**：色なし（3D プリンタ向け）。`.stl` と出典の文章を zip にまとめて保存
+   - **すべてまとめて**：上の全部と出典の文章を1つの zip に
+   - OBJ・STL はファイルの中に出典を書ききれないので、出典の文章ファイルと必ず一緒に出す
 
-作られる GLB の形：
+作られる形（GLB・OBJ・STL 共通）：
 
 - 1つの `.glb` に全部入り（外部ファイルの参照なし）。Draco などの形の圧縮は使わない
-- 単位はメートル、上は +Y、北は -Z。切り出した範囲の中心が原点、地面が高さ 0
+- 単位はメートル、上は +Y、北は -Z（OBJ・STL も GLB と同じ）。切り出した範囲の中心が原点、地面が高さ 0
+- OBJ は同じ位置の頂点を1つにまとめ、部品（`o`）は GLB と同じ名前。STL はバイナリ形式で、先頭に出典が別ファイルにある旨を英字で書く
 - 建物の底の面は省いて三角形を減らす。模様（テクスチャ）は使わず、壁・屋根・付属物・道路・地面の色分け
 - 中身は「Buildings」「Roads」「Ground」の3つの部品
-- `asset.copyright` と `extras.plateau` に出典（自治体・年度・データ名・ライセンス・入手先）と「加工して作成」の旨を記録
+- GLB は `asset.copyright` と `extras.plateau`、OBJ・.mtl は先頭のコメントに出典（自治体・年度・データ名・ライセンス・入手先）と「加工して作成」の旨を記録
 
 まだできないこと：地形（坂・高低差。建物は地面の高さ 0 にそろえて並べる）、橋・木など、建物の模様・窓（PLATEAU の写真の模様は一部の地域にしかなく粗いため使わない。窓の形のデータはほぼない）、地図で場所を選ぶこと。
 
@@ -55,7 +61,8 @@ npm run dev
   公式の配信元（`assets.cms.plateau.reearth.io`）から取得します。
 - 住所の検索には国土地理院の住所検索（`msearch.gsi.go.jp`、無料・登録不要）を使います。
 - PLATEAU のデータは「公共データ利用規約（第1.0版）」（CC BY 4.0 互換）で、出典の表示が必要です。
-  GLB と一緒にダウンロードできるクレジットの文章を、PlotBlock の素材のクレジット欄に貼ってください。
+  作ったもの（ファイル・3D プリントした物・画像や映像）を使うときは、一緒に保存されるクレジットの文章の出典を表示してください
+  （PlotBlock では素材のクレジット欄に貼る）。
   利用条件：https://www.mlit.go.jp/plateau/site-policy/
 
 ## 開発者向け
@@ -66,16 +73,16 @@ npm run dev
 | `npm run typecheck` | 型チェック |
 | `npm test` | 自動テスト（`tests/`。小さな見本データ `tests/fixtures/` を使い、glTF Validator と three.js の GLTFLoader で GLB を検査） |
 | `npm run build` | 型チェックと公開用のファイル作成（`dist/`） |
-| `npm run cli -- --lat 35.6812 --lon 139.7671 --size 300 --lod 1 --name 東京駅` | コマンドで GLB を作る（`--lod 2 --installations` で付属物、`--lod 3` で窓・扉〔試作〕）（取得したデータは `data/cache/` に保存。1ファイル200MB・合計1000MBを超えると中止） |
+| `npm run cli -- --lat 35.6812 --lon 139.7671 --size 300 --lod 1 --name 東京駅` | コマンドで GLB を作る（`--format glb,obj,stl` で OBJ・STL も。出典の文章はいつも一緒に出す）（`--lod 2 --installations` で付属物、`--lod 3` で窓・扉〔試作〕）（取得したデータは `data/cache/` に保存。1ファイル200MB・合計1000MBを超えると中止） |
 | `npm run app:dev` / `npm run app:build` | Windows アプリ版の起動・ビルド（Rust と Tauri の準備が要る。通常は GitHub の自動ビルドで作る） |
-| `npm run verify -- out/xxx.glb` | GLB を glTF Validator と three.js で検査し、外形・三角形の数を表示 |
+| `npm run verify -- out/xxx.glb out/xxx.obj out/xxx.stl` | GLB を glTF Validator と three.js で、OBJ・STL を three.js の OBJLoader・STLLoader で検査し、外形・三角形の数を表示 |
 
 PR を出す前の検証：`npm run typecheck`、`npm test`、`npm run build` がすべて通ること。
 GLB の出力を変えたときは、さらに実データで `npm run cli` と `npm run verify` を実行し、見た目に関わる変更は画面のプレビューのスクリーンショットで確かめる。
 
 構成：
 
-- `src/core/` … 画面とコマンドで共通の中身（場所→メッシュ番号、データカタログ、CityGML の読み取り、三角形分割、GLB 作成、出典）
+- `src/core/` … 画面とコマンドで共通の中身（場所→メッシュ番号、データカタログ、CityGML の読み取り、三角形分割、GLB 作成、OBJ・STL・zip の書き出し〔`export.ts`〕、出典）
 - `src/web/` … ブラウザの画面。重い処理は Web Worker（`worker.ts`）で行う
 - `scripts/` … コマンド（GLB 作成・検査）
 - `src-tauri/` … Windows アプリ版（Tauri）。画面は `dist/` をそのまま使い、保存だけ「名前を付けて保存」の窓（`save_file`）にする

@@ -3,6 +3,9 @@
 import type { SourceFile } from '../core/catalog.js';
 import {
   defaultFetchJson,
+  downloadFiles,
+  type DownloadFile,
+  type DownloadKind,
   generateFromPlan,
   planArea,
   responseText,
@@ -23,7 +26,7 @@ export type WorkerResponse =
       type: 'done';
       glb: ArrayBuffer;
       credit: string;
-      fileName: string;
+      files: Record<DownloadKind, DownloadFile>;
       stats: Awaited<ReturnType<typeof generateFromPlan>>['stats'];
     }
   | { type: 'cacheCleared' }
@@ -76,7 +79,9 @@ ctx.onmessage = async (ev: MessageEvent<WorkerRequest>) => {
         post({ type: 'progress', ratio: p.ratio, message: p.message }),
       );
       const glb = result.glb.slice().buffer as ArrayBuffer;
-      post({ type: 'done', glb, credit: result.credit, fileName: result.fileName, stats: result.stats }, [glb]);
+      const files = downloadFiles(result);
+      const transfer = [glb, ...Object.values(files).map((f) => f.data.buffer as ArrayBuffer)];
+      post({ type: 'done', glb, credit: result.credit, files, stats: result.stats }, [...new Set(transfer)]);
     } else if (msg.type === 'clearCache') {
       try {
         await caches.delete(CACHE_NAME);

@@ -1,6 +1,6 @@
 // 画面の操作。重い処理は worker.ts に任せる。
 import { searchPlace, type Place } from '../core/geocode.js';
-import type { AreaPlan, AreaRequest } from '../core/pipeline.js';
+import type { AreaPlan, AreaRequest, DownloadFile, DownloadKind } from '../core/pipeline.js';
 import { isDesktop, saveWithDialog } from './desktop.js';
 import { Preview } from './preview.js';
 import type { WorkerRequest, WorkerResponse } from './worker.js';
@@ -23,8 +23,11 @@ const messageEl = $<HTMLParagraphElement>('message');
 const resultEl = $<HTMLElement>('result');
 const statsEl = $<HTMLDListElement>('stats');
 const creditEl = $<HTMLPreElement>('credit');
-const dlGlb = $<HTMLAnchorElement>('dl-glb');
-const dlCredit = $<HTMLAnchorElement>('dl-credit');
+/** 保存のボタン（形式ごと） */
+const DOWNLOAD_KINDS: DownloadKind[] = ['glb', 'obj', 'stl', 'all', 'credit'];
+const dlLinks = Object.fromEntries(
+  DOWNLOAD_KINDS.map((k) => [k, $<HTMLAnchorElement>(`dl-${k}`)]),
+) as Record<DownloadKind, HTMLAnchorElement>;
 const clearCacheBtn = $<HTMLButtonElement>('clear-cache');
 
 /** 取得量がこれを超えるときは、作る前に確認する（MB） */
@@ -35,7 +38,7 @@ let busy = false;
 let preview: Preview | null = null;
 const objectUrls: string[] = [];
 /** デスクトップ版で保存するための、できあがったファイルの中身 */
-let lastFiles: { glb: { name: string; data: Uint8Array }; credit: { name: string; data: Uint8Array } } | null = null;
+let lastFiles: Record<DownloadKind, DownloadFile> | null = null;
 
 const worker = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });
 
@@ -178,17 +181,14 @@ makeBtn.addEventListener('click', async () => {
 
     // ダウンロード用のリンク
     for (const u of objectUrls.splice(0)) URL.revokeObjectURL(u);
-    const glbUrl = URL.createObjectURL(new Blob([res.glb], { type: 'model/gltf-binary' }));
-    const creditUrl = URL.createObjectURL(new Blob([res.credit], { type: 'text/plain;charset=utf-8' }));
-    objectUrls.push(glbUrl, creditUrl);
-    dlGlb.href = glbUrl;
-    dlGlb.download = `${res.fileName}.glb`;
-    dlCredit.href = creditUrl;
-    dlCredit.download = `${res.fileName}_credit.txt`;
-    lastFiles = {
-      glb: { name: dlGlb.download, data: new Uint8Array(res.glb.slice(0)) },
-      credit: { name: dlCredit.download, data: new TextEncoder().encode(res.credit) },
-    };
+    for (const kind of DOWNLOAD_KINDS) {
+      const f = res.files[kind];
+      const url = URL.createObjectURL(new Blob([f.data as BlobPart], { type: f.mime }));
+      objectUrls.push(url);
+      dlLinks[kind].href = url;
+      dlLinks[kind].download = f.name;
+    }
+    lastFiles = res.files;
     creditEl.textContent = res.credit;
 
     const s = res.stats;
@@ -219,11 +219,8 @@ makeBtn.addEventListener('click', async () => {
 });
 
 // デスクトップ版では、ダウンロードの代わりに「名前を付けて保存」の窓で保存する
-for (const [link, key] of [
-  [dlGlb, 'glb'],
-  [dlCredit, 'credit'],
-] as const) {
-  link.addEventListener('click', async (ev) => {
+for (const key of DOWNLOAD_KINDS) {
+  dlLinks[key].addEventListener('click', async (ev) => {
     if (!isDesktop() || !lastFiles) return;
     ev.preventDefault();
     const f = lastFiles[key];

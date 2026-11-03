@@ -9,7 +9,7 @@
   <body>
     <header class="top">
       <h1>PLATEAUtoGLB</h1>
-      <p class="lead">住所や地名から、その周りの建物を PlotBlock で使える GLB ファイルにします（データ：国土交通省 PLATEAU）。</p>
+      <p class="lead">住所や地名から、その周りの建物を 3D モデル（GLB・OBJ・STL）にします。3D プリンタ・編集ソフト・PlotBlock などで使えます（データ：国土交通省 PLATEAU）。</p>
     </header>
 
     <main>
@@ -58,8 +58,8 @@
       </section>
 
       <section class="card" aria-labelledby="h-make">
-        <h2 id="h-make"><span class="step">3</span>GLB を作る</h2>
-        <button id="make-btn" class="primary" disabled>GLB を作る</button>
+        <h2 id="h-make"><span class="step">3</span>3D モデルを作る</h2>
+        <button id="make-btn" class="primary" disabled>3D モデルを作る</button>
         <div id="progress" class="progress" hidden>
           <div class="bar"><div id="progress-fill"></div></div>
           <p id="progress-text"></p>
@@ -74,10 +74,17 @@
         <dl id="stats" class="stats"></dl>
         <div class="row">
           <a id="dl-glb" class="button primary" download>GLB を保存</a>
+          <a id="dl-obj" class="button" download>OBJ を保存</a>
+          <a id="dl-stl" class="button" download>STL を保存</a>
+          <a id="dl-all" class="button" download>すべてまとめて保存</a>
           <a id="dl-credit" class="button" download>クレジット（出典）を保存</a>
         </div>
+        <p class="hint">
+          GLB：色付き・1ファイル（PlotBlock・Web 向け）。OBJ：色付き（Blender などの編集ソフト向け）。STL：色なし（3D プリンタ向け）。
+          OBJ・STL・まとめて保存は、出典の文章ファイルと一緒に zip で保存します。単位はメートル、上は +Y です。
+        </p>
         <details>
-          <summary>クレジットの文章（PlotBlock の素材のクレジット欄に貼り付けてください）</summary>
+          <summary>クレジットの文章（作ったものを使うときは、この出典を表示してください）</summary>
           <pre id="credit"></pre>
         </details>
       </section>
