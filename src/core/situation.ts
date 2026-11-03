@@ -24,10 +24,16 @@ export interface AreaCharacter {
   areaHa: number;
   /** 1 ha あたりの棟数 */
   density: number;
-  /** 高さが分かる棟数と、その平均・ばらつき（標準偏差）（m） */
+  /** 高さが分かる棟数と、その平均（m） */
   heightKnown: number;
   avgHeight?: number;
+  /**
+   * 小さな建物（SMALL_M2 未満。物置・車庫など）を除いた、高さが分かる棟数・高さのばらつき（標準偏差、m）・
+   * 中層（高さ 10m 以上 31m 未満。おおむね 3〜9 階建て）の棟数。団地のように同じくらいの建物が並ぶかを見る
+   */
+  mainKnown: number;
   heightSd?: number;
+  mid: number;
   /** 高さ 31m 以上（おおむね 10 階建て以上）・60m 以上（超高層）の棟数 */
   tall31: number;
   tall60: number;
@@ -44,6 +50,8 @@ export function areaCharacter(buildings: CharacterInput[], areaM2: number): Area
     areaHa: areaM2 / 10000,
     density: areaM2 > 0 ? buildings.length / (areaM2 / 10000) : 0,
     heightKnown: 0,
+    mainKnown: 0,
+    mid: 0,
     tall31: 0,
     tall60: 0,
     footprintKnown: 0,
@@ -51,15 +59,21 @@ export function areaCharacter(buildings: CharacterInput[], areaM2: number): Area
     large: 0,
   };
   let heightSum = 0;
-  let heightSq = 0;
+  let mainSum = 0;
+  let mainSq = 0;
   let footSum = 0;
   for (const b of buildings) {
     if (b.measuredHeight !== undefined) {
       c.heightKnown++;
       heightSum += b.measuredHeight;
-      heightSq += b.measuredHeight ** 2;
       if (b.measuredHeight >= 31) c.tall31++;
       if (b.measuredHeight >= 60) c.tall60++;
+      if (b.footprintM2 !== undefined && b.footprintM2 >= SMALL_M2) {
+        c.mainKnown++;
+        mainSum += b.measuredHeight;
+        mainSq += b.measuredHeight ** 2;
+        if (b.measuredHeight >= 10 && b.measuredHeight < 31) c.mid++;
+      }
     }
     if (b.footprintM2 !== undefined && b.footprintM2 > 0) {
       c.footprintKnown++;
@@ -68,19 +82,20 @@ export function areaCharacter(buildings: CharacterInput[], areaM2: number): Area
       if (b.footprintM2 >= LARGE_M2) c.large++;
     }
   }
-  if (c.heightKnown > 0) {
-    c.avgHeight = heightSum / c.heightKnown;
-    c.heightSd = Math.sqrt(Math.max(0, heightSq / c.heightKnown - c.avgHeight ** 2));
+  if (c.heightKnown > 0) c.avgHeight = heightSum / c.heightKnown;
+  if (c.mainKnown > 0) {
+    const mean = mainSum / c.mainKnown;
+    c.heightSd = Math.sqrt(Math.max(0, mainSq / c.mainKnown - mean ** 2));
   }
   if (c.footprintKnown > 0) c.avgFootprint = footSum / c.footprintKnown;
   return c;
 }
 
 /** 根拠の数値の種類 */
-export type Metric = 'density' | 'avgHeight' | 'heightSd' | 'tall31' | 'tall60' | 'avgFootprint' | 'small' | 'large';
+export type Metric = 'density' | 'avgHeight' | 'heightSd' | 'mid' | 'tall31' | 'tall60' | 'avgFootprint' | 'small' | 'large';
 
 /** 割合の母数の種類（「高さが分かる N 棟のうち」など） */
-export type Basis = 'all' | 'height' | 'footprint';
+export type Basis = 'all' | 'height' | 'main' | 'footprint';
 
 /** 根拠の数値（文にするのは画面の側。言語ごとに書き方が違うため） */
 export interface Evidence {
@@ -102,7 +117,8 @@ export interface Evidence {
 const BASIS: Record<Metric, Basis> = {
   density: 'all',
   avgHeight: 'height',
-  heightSd: 'height',
+  heightSd: 'main',
+  mid: 'main',
   tall31: 'height',
   tall60: 'height',
   avgFootprint: 'footprint',
@@ -112,11 +128,12 @@ const BASIS: Record<Metric, Basis> = {
 
 export function evidenceOf(c: AreaCharacter, metric: Metric): Evidence {
   const basis = BASIS[metric];
-  const of = { all: c.buildings, height: c.heightKnown, footprint: c.footprintKnown }[basis];
+  const of = { all: c.buildings, height: c.heightKnown, main: c.mainKnown, footprint: c.footprintKnown }[basis];
   const n = {
     density: c.buildings,
     avgHeight: c.heightKnown,
-    heightSd: c.heightKnown,
+    heightSd: c.mainKnown,
+    mid: c.mid,
     tall31: c.tall31,
     tall60: c.tall60,
     avgFootprint: c.footprintKnown,
@@ -159,8 +176,8 @@ export interface Situation {
 
 // 候補の地域：PLATEAU の 3D 都市モデルがある自治体から選ぶ（scripts/check-situations.ts で
 // データカタログに建物のデータがあること・ファイルの大きさを確かめる）。
-// 駅前・戸建て住宅地の座標は国土地理院の住所検索で駅名・地名を調べた位置（2026-11-03）。
-// 工場・倉庫街とまばらな集落は、PLATEAU のデータで 300m 四方ずつ数えて特徴が合う所を選んだ位置（地名は CityGML の住所。2026-11-03）。
+// 駅前の座標は国土地理院の住所検索で駅名・地名を調べた位置（2026-11-03）。
+// 町並み（戸建て住宅地・団地・工場・倉庫街・まばらな集落）は、PLATEAU のデータで 300m 四方ずつ数えて特徴が合う所を選んだ位置（地名は CityGML の住所。2026-11-03）。
 export const SITUATIONS: Situation[] = [
   {
     id: 'city-station',
@@ -211,9 +228,24 @@ export const SITUATIONS: Situation[] = [
     approximation: { ja: '上から見て小さく、低い建物（家）が多く、密集している所', en: 'many small, low buildings (houses) packed closely together' },
     metrics: ['small', 'avgHeight', 'density', 'avgFootprint'],
     places: [
-      { name: { ja: '成城学園前駅（東京都世田谷区）', en: 'Seijogakuen-mae Station (Setagaya, Tokyo)' }, lat: 35.64, lon: 139.5989, note: { ja: '低い戸建てが並ぶ住宅街', en: 'streets of low detached houses' } },
-      { name: { ja: '石神井公園駅（東京都練馬区）', en: 'Shakujii-koen Station (Nerima, Tokyo)' }, lat: 35.7437, lon: 139.606, note: { ja: '公園のそばの住宅街', en: 'residential area near a park' } },
-      { name: { ja: '荻窪駅（東京都杉並区）', en: 'Ogikubo Station (Suginami, Tokyo)' }, lat: 35.7044, lon: 139.6202, note: { ja: '駅の周りに住宅が広がる', en: 'houses spread around the station' } },
+      { name: { ja: '成城二丁目（東京都世田谷区）', en: 'Seijo 2-chome (Setagaya, Tokyo)' }, lat: 35.6374, lon: 139.5996, note: { ja: '低い戸建てが並ぶ住宅街', en: 'streets of low detached houses' } },
+      { name: { ja: '高野台五丁目（東京都練馬区）', en: 'Takanodai 5-chome (Nerima, Tokyo)' }, lat: 35.7484, lon: 139.611, note: { ja: '石神井公園駅の近くの住宅街', en: 'residential area near Shakujii-koen Station' } },
+      { name: { ja: '南荻窪四丁目（東京都杉並区）', en: 'Minami-Ogikubo 4-chome (Suginami, Tokyo)' }, lat: 35.7013, lon: 139.6142, note: { ja: '家が密集する住宅街', en: 'densely packed houses' } },
+    ],
+  },
+  {
+    id: 'housing-estate',
+    kind: 'town',
+    label: { ja: '団地', en: 'Apartment complex' },
+    approximation: {
+      ja: '物置・自転車置き場などの小さな建物を除くと、中層（3〜9 階建てくらい）の建物が多く、高さがそろっている所',
+      en: 'excluding small sheds, mostly mid-rise buildings (about 3–9 floors) of similar height',
+    },
+    metrics: ['mid', 'heightSd', 'avgFootprint', 'density'],
+    places: [
+      { name: { ja: '高島平三丁目（東京都板橋区）', en: 'Takashimadaira 3-chome (Itabashi, Tokyo)' }, lat: 35.7863, lon: 139.6544, note: { ja: '同じ形の住棟が並ぶ', en: 'rows of identical apartment blocks' } },
+      { name: { ja: '高島平二丁目（東京都板橋区）', en: 'Takashimadaira 2-chome (Itabashi, Tokyo)' }, lat: 35.7848, lon: 139.66, note: { ja: '大きな団地の住棟', en: 'blocks of a large housing estate' } },
+      { name: { ja: '高島平八丁目（東京都板橋区）', en: 'Takashimadaira 8-chome (Itabashi, Tokyo)' }, lat: 35.7901, lon: 139.6605, note: { ja: '中層の集合住宅が多い', en: 'many mid-rise apartment buildings' } },
     ],
   },
   {

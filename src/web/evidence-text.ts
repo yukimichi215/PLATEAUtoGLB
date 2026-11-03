@@ -6,6 +6,7 @@ const LABEL: Record<Metric, MessageKey> = {
   density: 'evidence.density',
   avgHeight: 'evidence.avgHeight',
   heightSd: 'evidence.heightSd',
+  mid: 'evidence.mid',
   tall31: 'evidence.tall31',
   tall60: 'evidence.tall60',
   avgFootprint: 'evidence.avgFootprint',
@@ -16,11 +17,13 @@ const LABEL: Record<Metric, MessageKey> = {
 const WHAT: Record<Evidence['basis'], MessageKey> = {
   all: 'evidence.what.height',
   height: 'evidence.what.height',
+  main: 'evidence.what.height',
   footprint: 'evidence.what.footprint',
 };
 
 const SHARE: Record<Exclude<Evidence['basis'], 'all'>, MessageKey> = {
   height: 'evidence.share.height',
+  main: 'evidence.share.main',
   footprint: 'evidence.share.footprint',
 };
 

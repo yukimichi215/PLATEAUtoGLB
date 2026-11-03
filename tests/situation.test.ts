@@ -39,13 +39,16 @@ describe('シチュエーション検索の根拠の数値', () => {
     );
     expect(c).toMatchObject({ buildings: 4, areaHa: 2, density: 2, heightKnown: 3, tall31: 2, tall60: 1, footprintKnown: 3, small: 1, large: 1 });
     expect(c.avgHeight).toBeCloseTo(40, 9);
-    expect(c.heightSd).toBeCloseTo(Math.sqrt(600), 9); // (900 + 0 + 900) / 3
+    // 高さのばらつき・中層は、小さな建物（150m² 未満）を除いた 40m と 70m の2棟で数える
+    expect(c).toMatchObject({ mainKnown: 2, mid: 0 });
+    expect(c.heightSd).toBeCloseTo(15, 9);
+    expect(areaCharacter([{ measuredHeight: 12, footprintM2: 400 }, { measuredHeight: 20, footprintM2: 400 }, { measuredHeight: 3, footprintM2: 20 }], 10000)).toMatchObject({ mainKnown: 2, mid: 2 });
     expect(c.avgFootprint).toBeCloseTo(1200, 9);
     expect(evidenceOf(c, 'small')).toMatchObject({ known: true, n: 1, of: 3, pct: 33 });
     expect(evidenceText(evidenceOf(c, 'large'), 'ja').value).toBe('33%（1 棟 / 3 棟）');
     expect(evidenceText(evidenceOf(c, 'density'), 'ja').value).toBe('1 ha（100m 四方）あたり 2.0 棟（4 棟 / 2.0 ha）');
     expect(evidenceText(evidenceOf(c, 'tall60'), 'ja').value).toBe('1 棟（高さが分かる 3 棟のうち 33%）');
-    expect(evidenceText(evidenceOf(c, 'heightSd'), 'ja').value).toBe('± 24.5 m（高さが分かる 3 棟）');
+    expect(evidenceText(evidenceOf(c, 'heightSd'), 'ja').value).toBe('± 15.0 m（小さな建物を除いて高さが分かる 2 棟）');
     expect(evidenceText(evidenceOf(c, 'avgFootprint'), 'ja').value).toBe('1,200 m²（3 棟）');
     expect(evidenceText(evidenceOf(c, 'avgHeight'), 'en').value).toBe('40.0 m (3 buildings with a known height)');
     expect(evidenceText(evidenceOf(c, 'small'), 'en')).toEqual({ label: 'Small buildings (under 150 m² from above, about a house)', value: '33% (1 of 3 buildings)' });
@@ -126,7 +129,7 @@ describe('シチュエーション検索の根拠の数値', () => {
       const ev = situationEvidence(s, areaCharacter([], 90000));
       expect(ev.map((e) => e.metric)).toEqual(s.metrics);
     }
-    // 駅前3種類と、町並み（戸建て住宅地・工場・倉庫街・まばらな集落）。見た目でわからない条件（木造・古さ）は作らない
-    expect([...ids]).toEqual(['city-station', 'regional-station', 'rural-station', 'detached-houses', 'industrial', 'sparse-village']);
+    // 駅前3種類と、町並み（戸建て住宅地・団地・工場・倉庫街・まばらな集落）。見た目でわからない条件（木造・古さ）は作らない
+    expect([...ids]).toEqual(['city-station', 'regional-station', 'rural-station', 'detached-houses', 'housing-estate', 'industrial', 'sparse-village']);
   });
 });
