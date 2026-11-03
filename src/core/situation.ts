@@ -237,7 +237,7 @@ export const SITUATIONS: Situation[] = [
     id: 'horror',
     kind: 'genre',
     label: '古い木造の町並み（ホラー・時代もの向き）',
-    approximation: '古い建物と木造の建物の多さで近似（雰囲気そのものはデータにない）',
+    approximation: '古い建物と木造の建物が多い所',
     metrics: ['old', 'wooden', 'avgHeight'],
     places: [
       { name: 'ひがし茶屋街（金沢市東山）', lat: 36.5714, lon: 136.6669, note: '古い木造の町並みが残る' },
