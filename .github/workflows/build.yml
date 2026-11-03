@@ -1,6 +1,6 @@
 # 自動ビルド（規則 CLAUDE.md §6 に従う）
 # ・作業ブランチ・PR：検査とビルドができるかの確認だけ（できたファイルは保存しない）
-# ・main に取り込まれたとき：Windows 版の exe を作り、最新の1つだけを7日間保存する（古いものは消す）
+# ・main に取り込まれたときも同じ確認だけ（ブラウザ版に一本化したので、配るファイルは作らない）
 name: build
 
 on:
@@ -33,60 +33,3 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
-
-  windows:
-    name: Windows 版（exe）
-    needs: check
-    runs-on: windows-latest
-    # Rust のビルドは初回（キャッシュなし）に時間がかかるため、目安の15分より少し長くする
-    timeout-minutes: 25
-    permissions:
-      contents: read
-      actions: write # main のとき、古い成果物を消すため
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci --ignore-scripts
-      - name: Rust のビルド置き場を使い回す
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            src-tauri/target
-          key: cargo-windows-${{ hashFiles('src-tauri/Cargo.lock') }}
-          restore-keys: cargo-windows-
-      - name: exe を作る
-        run: npx tauri build --no-bundle -- --locked
-      - name: Rust のテスト
-        run: cargo test --release --locked --manifest-path src-tauri/Cargo.toml
-
-      # ここから下は main のときだけ（PR では成果物を保存しない）
-      - name: 配るファイルをまとめる
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force out-desktop | Out-Null
-          Copy-Item src-tauri/target/release/PLATEAUtoGLB.exe out-desktop/
-          Copy-Item desktop/README.txt out-desktop/
-      - name: 古い Windows 版の成果物を消す
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh api "repos/${{ github.repository }}/actions/artifacts?name=PLATEAUtoGLB-windows&per_page=100" \
-            --jq '.artifacts[].id' | while read -r id; do
-            gh api -X DELETE "repos/${{ github.repository }}/actions/artifacts/$id"
-          done
-      - name: 最新の Windows 版を保存（7日間）
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: actions/upload-artifact@v4
-        with:
-          name: PLATEAUtoGLB-windows
-          path: out-desktop/
-          retention-days: 7
-          if-no-files-found: error
