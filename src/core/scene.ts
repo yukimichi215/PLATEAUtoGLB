@@ -82,7 +82,7 @@ export interface SceneOptions {
   projector: LocalProjector;
   /** 切り出す正方形の一辺の半分（m） */
   half: number;
-  /** 1 = 箱型（軽い）、2 = 屋根の形あり、3 = 窓・扉まで（試作。LOD3 のない建物は LOD2 → LOD1 で代用） */
+  /** 1 = 箱型（軽い）、2 = 屋根の形あり、3 = 窓・扉まで（LOD3 のない建物は LOD2 → LOD1 で代用） */
   lod: 1 | 2 | 3;
   /** ベランダなどの付属物を入れる（LOD2・LOD3 のとき） */
   installations?: boolean;
@@ -291,12 +291,13 @@ export class SceneBuilder {
     if (!Number.isFinite(minY)) return false;
 
     if (this.opt.solid) {
-      if (!this.addSolidBuilding(b, local, minY)) {
+      const lodUsed = this.addSolidBuilding(b, local, useLod3 ? 3 : useLod2 ? 2 : 1, minY);
+      if (lodUsed === 0) {
         this.skippedBuildings++;
         return false;
       }
-      this.recordBuilding(b, cx, cz, (maxY - minY) * this.heightScale, useLod3 ? 3 : useLod2 ? 2 : 1, 0);
-      if (useLod3) this.lod3Buildings++;
+      this.recordBuilding(b, cx, cz, (maxY - minY) * this.heightScale, lodUsed, 0);
+      if (lodUsed === 3) this.lod3Buildings++;
       return true;
     }
 
@@ -387,16 +388,18 @@ export class SceneBuilder {
   /**
    * 閉じた形の建物を足す。上を向いた面（屋根。箱型なら上の面）を、それぞれ真下へ押し出した柱にする。
    * 選んだ細かさに屋根の面がなければ、屋根の形（LOD2）→ 箱型（LOD1）の順に代わりを使う。
+   * 使った細かさを返す（どれでも作れなければ 0）。
    */
   private addSolidBuilding(
     b: Building,
     local: { kind: Lod3Kind; exterior: number[]; interiors: number[][] }[],
+    lod: 1 | 2 | 3,
     minY: number,
-  ): boolean {
-    const candidates = [local];
-    if (b.lod2.length > 0) candidates.push(b.lod2.map((s) => this.localSurface(s.kind, s.polygon)));
-    if (b.lod1.length > 0) candidates.push(b.lod1.map((p) => this.localSurface('other', p)));
-    for (const surfaces of candidates) {
+  ): 0 | 1 | 2 | 3 {
+    const candidates: { lod: 1 | 2 | 3; surfaces: typeof local }[] = [{ lod, surfaces: local }];
+    if (lod > 2 && b.lod2.length > 0) candidates.push({ lod: 2, surfaces: b.lod2.map((s) => this.localSurface(s.kind, s.polygon)) });
+    if (lod > 1 && b.lod1.length > 0) candidates.push({ lod: 1, surfaces: b.lod1.map((p) => this.localSurface('other', p)) });
+    for (const { lod: candidateLod, surfaces } of candidates) {
       const solids: Solid[] = [];
       let failed = 0;
       for (const s of surfaces) {
@@ -421,10 +424,10 @@ export class SceneBuilder {
       if (solids.length > 0) {
         this.solids.buildings.push(solids);
         this.droppedFaces += failed;
-        return true;
+        return candidateLod;
       }
     }
-    return false;
+    return 0;
   }
 
   private localSurface(kind: Lod3Kind, polygon: Polygon) {
