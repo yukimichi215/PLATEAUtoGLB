@@ -12,6 +12,9 @@ export interface Polygon {
 
 export type SurfaceKind = 'roof' | 'wall' | 'ground' | 'other';
 
+/** LOD3 の面の種類。壁・屋根などに加えて、窓・扉（開口部）がある */
+export type Lod3Kind = SurfaceKind | 'window' | 'door';
+
 export interface BuildingAttributes {
   measuredHeight?: number;
   storeysAboveGround?: number;
@@ -33,6 +36,10 @@ export interface Building {
   lod2: { kind: SurfaceKind; polygon: Polygon }[];
   /** ベランダ・ひさし・屋上の設備などの付属物（LOD2 の形。地域によってはない） */
   installations: Polygon[];
+  /** LOD3：窓・扉まである細かい形。ごく一部の地域・建物にだけある */
+  lod3: { kind: Lod3Kind; polygon: Polygon }[];
+  /** LOD3 の付属物（LOD3 の建物にだけある） */
+  installations3: Polygon[];
 }
 
 export interface Road {
@@ -120,6 +127,13 @@ export class CityGmlReader {
   private installationDepth = -1;
   /** 付属物の中の形（bldg:lod2Geometry） */
   private installationGeomDepth = -1;
+  /** 付属物の中の LOD3 の形（bldg:lod3Geometry） */
+  private installation3GeomDepth = -1;
+  /** LOD3 の形（bldg:lod3MultiSurface） */
+  private lod3Depth = -1;
+  /** 窓・扉（bldg:Window / bldg:Door）の中 */
+  private openingKind: 'window' | 'door' | null = null;
+  private openingDepth = -1;
   /** 部屋の中（使わないので読み飛ばす） */
   private roomDepth = -1;
   private surfaceKind: SurfaceKind | null = null;
@@ -157,7 +171,7 @@ export class CityGmlReader {
 
     if (name === 'bldg:Building' && !this.building) {
       const id = String(node.attributes['gml:id'] ?? '');
-      this.building = { id, attrs: {}, lod1: [], lod2: [], installations: [] };
+      this.building = { id, attrs: {}, lod1: [], lod2: [], installations: [], lod3: [], installations3: [] };
       this.buildingDepth = depth;
       return;
     }
@@ -181,6 +195,13 @@ export class CityGmlReader {
         this.installationGeomDepth < 0
       ) {
         this.installationGeomDepth = depth;
+      } else if (this.installationDepth >= 0 && name === 'bldg:lod3Geometry' && this.installation3GeomDepth < 0) {
+        this.installation3GeomDepth = depth;
+      } else if ((name === 'bldg:Window' || name === 'bldg:Door') && this.openingDepth < 0) {
+        this.openingKind = name === 'bldg:Window' ? 'window' : 'door';
+        this.openingDepth = depth;
+      } else if (name === 'bldg:lod3MultiSurface' && this.installationDepth < 0 && this.lod3Depth < 0) {
+        this.lod3Depth = depth;
       } else if (name in SURFACE_KIND && this.surfaceDepth < 0) {
         this.surfaceKind = SURFACE_KIND[name] ?? 'other';
         this.surfaceDepth = depth;
@@ -189,7 +210,13 @@ export class CityGmlReader {
         this.lod2Depth < 0
       ) {
         this.lod2Depth = depth;
-      } else if (name in ATTR_TAGS && this.installationDepth < 0 && this.roomDepth < 0) {
+      } else if (
+        name in ATTR_TAGS &&
+        this.installationDepth < 0 &&
+        this.roomDepth < 0 &&
+        this.openingDepth < 0 &&
+        this.surfaceDepth < 0
+      ) {
         this.startText();
       }
     } else if (this.road) {
@@ -212,8 +239,8 @@ export class CityGmlReader {
   private wantsGeometry(): boolean {
     if (this.building) {
       if (this.roomDepth >= 0) return false;
-      if (this.installationDepth >= 0) return this.installationGeomDepth >= 0;
-      return this.lod1Depth >= 0 || this.lod2Depth >= 0;
+      if (this.installationDepth >= 0) return this.installationGeomDepth >= 0 || this.installation3GeomDepth >= 0;
+      return this.lod1Depth >= 0 || this.lod2Depth >= 0 || this.lod3Depth >= 0;
     }
     if (this.road) return this.roadLod1Depth >= 0;
     return false;
@@ -277,6 +304,12 @@ export class CityGmlReader {
     if (depth === this.lod2Depth) this.lod2Depth = -1;
     if (depth === this.installationDepth) this.installationDepth = -1;
     if (depth === this.installationGeomDepth) this.installationGeomDepth = -1;
+    if (depth === this.installation3GeomDepth) this.installation3GeomDepth = -1;
+    if (depth === this.lod3Depth) this.lod3Depth = -1;
+    if (depth === this.openingDepth) {
+      this.openingDepth = -1;
+      this.openingKind = null;
+    }
     if (depth === this.roomDepth) this.roomDepth = -1;
     if (depth === this.surfaceDepth) {
       this.surfaceDepth = -1;
@@ -301,6 +334,9 @@ export class CityGmlReader {
     if (this.building) {
       if (this.installationDepth >= 0) {
         if (this.installationGeomDepth >= 0) this.building.installations.push(poly);
+        else if (this.installation3GeomDepth >= 0) this.building.installations3.push(poly);
+      } else if (this.lod3Depth >= 0) {
+        this.building.lod3.push({ kind: this.openingKind ?? this.surfaceKind ?? 'other', polygon: poly });
       } else if (this.lod1Depth >= 0) {
         this.building.lod1.push(poly);
       } else if (this.lod2Depth >= 0) {

@@ -25,7 +25,7 @@ const { values } = parseArgs({
 });
 
 if (!values.lat || !values.lon) {
-  console.error('使い方: npm run cli -- --lat <緯度> --lon <経度> [--size 300] [--lod 1|2] [--installations] [--name 名前]');
+  console.error('使い方: npm run cli -- --lat <緯度> --lon <経度> [--size 300] [--lod 1|2|3] [--installations] [--name 名前]');
   process.exit(1);
 }
 
@@ -83,7 +83,7 @@ const openText: OpenText = async (file: SourceFile, onBytes) => {
 const req = {
   center: { lat: Number(values.lat), lon: Number(values.lon) },
   size: Number(values.size),
-  lod: (values.lod === '2' ? 2 : 1) as 1 | 2,
+  lod: (values.lod === '3' ? 3 : values.lod === '2' ? 2 : 1) as 1 | 2 | 3,
   installations: values.installations,
   includeRoads: !values['no-roads'],
   includeGround: !values['no-ground'],
