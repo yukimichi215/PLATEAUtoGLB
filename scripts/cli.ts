@@ -6,6 +6,7 @@ import { Readable, Transform } from 'node:stream';
 import { pipeline as streamPipeline } from 'node:stream/promises';
 import { parseArgs } from 'node:util';
 import type { SourceFile } from '../src/core/catalog.js';
+import { parseFormats } from '../src/core/export.js';
 import { defaultFetchJson, generateFromPlan, planArea, type OpenText } from '../src/core/pipeline.js';
 
 const { values } = parseArgs({
@@ -23,20 +24,28 @@ const { values } = parseArgs({
     'max-file-mb': { type: 'string', default: '200' },
     /** 書き出す形式（カンマ区切り）：glb, obj, stl */
     format: { type: 'string', default: 'glb' },
+    /** 3Dプリンタ用（縮尺・台座・閉じた形）。--scale か --fit-mm と一緒に使う */
+    print: { type: 'boolean', default: false },
+    /** 縮尺の分母（1/1000 なら 1000） */
+    scale: { type: 'string', default: '1000' },
+    /** 台座の一辺をこの長さ（mm）にする（--scale の代わり） */
+    'fit-mm': { type: 'string' },
+    /** 台座の厚さ（mm。0 で台座なし） */
+    'base-mm': { type: 'string', default: '3' },
   },
 });
 
 if (!values.lat || !values.lon) {
-  console.error('使い方: npm run cli -- --lat <緯度> --lon <経度> [--size 300] [--lod 1|2|3] [--installations] [--format glb,obj,stl] [--name 名前]');
+  console.error('使い方: npm run cli -- --lat <緯度> --lon <経度> [--size 300] [--lod 1|2|3] [--installations] [--format glb,obj,stl] [--print [--scale 1000 | --fit-mm 100] [--base-mm 3]] [--name 名前]');
   process.exit(1);
 }
 
-const formats = new Set(values.format!.split(',').map((f) => f.trim().toLowerCase()));
-for (const f of formats) {
-  if (!['glb', 'obj', 'stl'].includes(f)) {
-    console.error(`形式 ${f} には対応していません（glb, obj, stl）`);
-    process.exit(1);
-  }
+let formats: Set<string>;
+try {
+  formats = new Set(parseFormats(values.format!));
+} catch (e) {
+  console.error(e instanceof Error ? e.message : e);
+  process.exit(1);
 }
 
 const CACHE_DIR = resolve('data/cache');
@@ -98,6 +107,11 @@ const req = {
   includeRoads: !values['no-roads'],
   includeGround: !values['no-ground'],
   placeName: values.name,
+  print: values.print
+    ? values['fit-mm'] !== undefined
+      ? { fitSideMm: Number(values['fit-mm']), baseMm: Number(values['base-mm']) }
+      : { scaleDenominator: Number(values.scale), baseMm: Number(values['base-mm']) }
+    : undefined,
 };
 
 const t0 = Date.now();

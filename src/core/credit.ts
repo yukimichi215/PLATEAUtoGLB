@@ -32,7 +32,10 @@ export interface UsedFile {
   cityCodes: Set<string>;
 }
 
-export function buildCredit(used: UsedFile[], area: { description: string; createdAt: string }): CreditInfo {
+export function buildCredit(
+  used: UsedFile[],
+  area: { description: string; createdAt: string; /** 追加の加工の内容（3Dプリンタ用など） */ processing?: string[] },
+): CreditInfo {
   const byCity = new Map<string, CreditSource>();
   for (const { file, cityCodes } of used) {
     // 建物に自治体コードが書いてあれば、その自治体だけを出典にする。なければ配布元の全自治体
@@ -74,6 +77,7 @@ export function buildCredit(used: UsedFile[], area: { description: string; creat
   lines.push('・形を軽くする（建物の底面を省く、面の細かな情報や PLATEAU の写真の模様は使わない）');
   lines.push('・建物の地面の高さを 0 にそろえて並べ直す（地形は含まない）');
   if (used.some((u) => u.file.type === 'tran')) lines.push('・道路は範囲の形に切り取り、平らな板にする');
+  for (const p of area.processing ?? []) lines.push(`・${p}`);
   lines.push('');
   lines.push('このファイルは、上記のデータをもとに PLATEAUtoGLB で加工して作成したものです。');
   lines.push('GLB・OBJ・STL のどの形式で使うときも、また 3D プリントした物や画像・映像にして使うときも、この出典を表示してください。');

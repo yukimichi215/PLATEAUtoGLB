@@ -1,7 +1,8 @@
 // 建物・道路を、切り出した範囲の中心を原点にした三角形の集まりにする。
 import type { Building, Lod3Kind, Polygon, Road } from './citygml.js';
 import { LocalProjector } from './geo.js';
-import { clipRingToSquare, triangulatePolygon } from './geometry.js';
+import { clipRing3ToSquare, clipRingToSquare, triangulatePolygon } from './geometry.js';
+import { extrudeDown, type Solid } from './solid.js';
 
 export type PartName = 'wall' | 'roof' | 'detail' | 'window' | 'door' | 'road' | 'ground';
 
@@ -25,7 +26,42 @@ export class MeshPart {
     }
     for (const idx of indices) this.indices.push(base + idx);
   }
+
+  /**
+   * 三角形を、三角形ごとに別の頂点として足す（法線は面ごと＝角ばった見た目）。
+   * positions は共有された頂点、indices はその番号。
+   */
+  addFlatTriangles(positions: ArrayLike<number>, indices: ArrayLike<number>): void {
+    const p = positions;
+    for (let t = 0; t < indices.length; t += 3) {
+      const [a, b, c] = [indices[t]! * 3, indices[t + 1]! * 3, indices[t + 2]! * 3];
+      const e1 = [p[b]! - p[a]!, p[b + 1]! - p[a + 1]!, p[b + 2]! - p[a + 2]!];
+      const e2 = [p[c]! - p[a]!, p[c + 1]! - p[a + 1]!, p[c + 2]! - p[a + 2]!];
+      let nx = e1[1]! * e2[2]! - e1[2]! * e2[1]!;
+      let ny = e1[2]! * e2[0]! - e1[0]! * e2[2]!;
+      let nz = e1[0]! * e2[1]! - e1[1]! * e2[0]!;
+      const len = Math.hypot(nx, ny, nz);
+      if (len > 1e-12) {
+        nx /= len; ny /= len; nz /= len;
+      } else {
+        nx = 0; ny = 1; nz = 0;
+      }
+      for (const v of [a, b, c]) {
+        this.indices.push(this.vertexCount);
+        this.positions.push(p[v]!, p[v + 1]!, p[v + 2]!);
+        this.normals.push(nx, ny, nz);
+      }
+    }
+  }
 }
+
+/**
+ * 閉じた形の柱の下の端の仮の高さ。台座の厚さは縮尺が決まるまで分からないので、
+ * いったんこの値で作り、あとで（print.ts で）本当の高さに置き換える。
+ */
+export const SOLID_BOTTOM = -1e6;
+/** 閉じた形の道路の上の面の仮の高さ（同じく、あとで置き換える） */
+export const SOLID_ROAD_TOP = -2e6;
 
 export interface SceneOptions {
   /** 中心 */
@@ -36,6 +72,11 @@ export interface SceneOptions {
   lod: 1 | 2 | 3;
   /** ベランダなどの付属物を入れる（LOD2・LOD3 のとき） */
   installations?: boolean;
+  /**
+   * 3Dプリンタ向けの閉じた形にする。建物は屋根の面を真下へ押し出した柱、道路は薄い板にする。
+   * 窓・扉・付属物は細かすぎて印刷できないので入れない。
+   */
+  solid?: boolean;
 }
 
 export interface BuildingInfo {
@@ -95,6 +136,8 @@ export const ROAD_HEIGHT = 0.15;
 
 export class SceneBuilder {
   readonly parts: Record<PartName, MeshPart>;
+  /** 3Dプリンタ用（solid）のとき：まとめる前の閉じた形（建物の柱・道路の板） */
+  readonly solids: { buildings: Solid[]; roads: Solid[] } = { buildings: [], roads: [] };
   readonly buildings: BuildingInfo[] = [];
   readonly cities = new Set<string>();
   private readonly seen = new Set<string>();
@@ -176,6 +219,16 @@ export class SceneBuilder {
     }
     if (!Number.isFinite(minY)) return false;
 
+    if (this.opt.solid) {
+      if (!this.addSolidBuilding(b, local, minY)) {
+        this.skippedBuildings++;
+        return false;
+      }
+      this.recordBuilding(b, cx, cz, maxY - minY, useLod3 ? 3 : useLod2 ? 2 : 1, 0);
+      if (useLod3) this.lod3Buildings++;
+      return true;
+    }
+
     // 建物の中心（ローカル座標）。窓・扉を外側へ少し浮かせる向きを決めるのに使う
     const [bx, bz] = [cx, cz];
     let added = 0;
@@ -220,23 +273,72 @@ export class SceneBuilder {
     }
 
     if (useLod3) this.lod3Buildings++;
+    this.recordBuilding(b, cx, cz, maxY - minY, useLod3 ? 3 : useLod2 ? 2 : 1, installationFaces);
+    return true;
+  }
+
+  private recordBuilding(b: Building, cx: number, cz: number, height: number, lodUsed: 1 | 2 | 3, installationFaces: number): void {
     if (b.attrs.city) this.cities.add(b.attrs.city);
     this.buildings.push({
       id: b.id,
       buildingId: b.attrs.buildingId,
       usage: b.attrs.usage,
       measuredHeight: b.attrs.measuredHeight,
-      modelHeight: Math.round((maxY - minY) * 100) / 100,
+      modelHeight: Math.round(height * 100) / 100,
       storeys: b.attrs.storeysAboveGround,
       yearOfConstruction: b.attrs.yearOfConstruction,
       name: b.attrs.name,
       city: b.attrs.city,
       x: Math.round(cx * 10) / 10,
       z: Math.round(cz * 10) / 10,
-      lodUsed: useLod3 ? 3 : useLod2 ? 2 : 1,
+      lodUsed,
       installationFaces,
     });
-    return true;
+  }
+
+  /**
+   * 閉じた形の建物を足す。上を向いた面（屋根。箱型なら上の面）を、それぞれ真下へ押し出した柱にする。
+   * 選んだ細かさに屋根の面がなければ、屋根の形（LOD2）→ 箱型（LOD1）の順に代わりを使う。
+   */
+  private addSolidBuilding(
+    b: Building,
+    local: { kind: Lod3Kind; exterior: number[]; interiors: number[][] }[],
+    minY: number,
+  ): boolean {
+    const candidates = [local];
+    if (b.lod2.length > 0) candidates.push(b.lod2.map((s) => this.localSurface(s.kind, s.polygon)));
+    if (b.lod1.length > 0) candidates.push(b.lod1.map((p) => this.localSurface('other', p)));
+    for (const surfaces of candidates) {
+      const solids: Solid[] = [];
+      for (const s of surfaces) {
+        if (s.kind !== 'roof' && s.kind !== 'other') continue;
+        // 上か下を向いた面だけ使う（壁は使わない）。元データの面の表裏はそろっていないことがあるので、向きの符号は見ない
+        const tri = triangulatePolygon(s.exterior, s.interiors);
+        if (!tri || Math.abs(tri.normal[1]) < (s.kind === 'roof' ? 0.05 : 0.3)) continue;
+        // 3Dプリンタ用は、範囲からはみ出した部分を切り落として、台座をちょうど切り出した正方形にする
+        const half = this.opt.half;
+        const ext = clipRing3ToSquare(s.exterior.map((v, i) => (i % 3 === 1 ? v - minY : v)), half);
+        if (ext.length === 0) continue;
+        const holes = s.interiors
+          .map((r) => clipRing3ToSquare(r.map((v, i) => (i % 3 === 1 ? v - minY : v)), half))
+          .filter((r) => r.length > 0);
+        // 地面の高さにある面（建物の底）は使わない
+        let top = -Infinity;
+        for (let i = 1; i < ext.length; i += 3) top = Math.max(top, ext[i]!);
+        if (top < 0.05) continue;
+        const solid = extrudeDown(ext, holes, SOLID_BOTTOM);
+        if (solid) solids.push(solid);
+      }
+      if (solids.length > 0) {
+        this.solids.buildings.push(...solids);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private localSurface(kind: Lod3Kind, polygon: Polygon) {
+    return { kind, exterior: this.toLocal(polygon.exterior), interiors: polygon.interiors.map((r) => this.toLocal(r)) };
   }
 
   /** 道路を範囲で切り取り、平らにして追加する */
@@ -262,6 +364,16 @@ export class SceneBuilder {
         for (let i = 0; i < ring.length; i += 2) out.push(ring[i]!, ROAD_HEIGHT, ring[i + 1]!);
         return out;
       };
+      if (this.opt.solid) {
+        const solid = extrudeDown(to3(ext), holes.map(to3), SOLID_BOTTOM);
+        if (!solid) continue;
+        for (let i = 1; i < solid.positions.length; i += 3) {
+          if (solid.positions[i] === ROAD_HEIGHT) solid.positions[i] = SOLID_ROAD_TOP;
+        }
+        this.solids.roads.push(solid);
+        added = true;
+        continue;
+      }
       const tri = triangulatePolygon(to3(ext), holes.map(to3));
       if (!tri) continue;
       // 道路は必ず上向きにする

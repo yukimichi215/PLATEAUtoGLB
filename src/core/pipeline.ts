@@ -4,8 +4,9 @@ import { findSourceFiles, type FeatureType, type FetchJson, type SourceFile } fr
 import { readCityGml } from './citygml.js';
 import { buildCredit, LICENSE_TEXT, type UsedFile } from './credit.js';
 import { LocalProjector, meshCodesForBox, type LatLon } from './geo.js';
-import { makeZip, toMtl, toObj, toStl } from './export.js';
+import { makeZip, stlHeader, toMtl, toObj, toStl } from './export.js';
 import { buildGlb } from './glb.js';
+import { finishForPrint, ROAD_PRINT_MM, scaleParts, validatePrint, type PrintInfo, type PrintOptions } from './print.js';
 import { SceneBuilder, type BuildingInfo } from './scene.js';
 
 export const MIN_SIZE = 50;
@@ -24,6 +25,11 @@ export interface AreaRequest {
   includeGround: boolean;
   /** 場所の名前（表示・記録用） */
   placeName?: string;
+  /**
+   * 3Dプリンタ用にする（縮尺・台座・閉じた形）。指定しないときは実物の大きさ（メートル）のまま。
+   * 3Dプリンタ用のときは付属物・窓・扉・地面の板は入れない（台座が地面の代わり）。
+   */
+  print?: PrintOptions;
 }
 
 export interface AreaPlan {
@@ -44,6 +50,7 @@ export function validateRequest(req: AreaRequest): void {
   if (!(req.size >= MIN_SIZE && req.size <= MAX_SIZE)) {
     throw new Error(`広さは ${MIN_SIZE}〜${MAX_SIZE} m の範囲で指定してください。`);
   }
+  if (req.print) validatePrint(req.print);
 }
 
 export async function planArea(req: AreaRequest, fetchJson: FetchJson): Promise<AreaPlan> {
@@ -81,6 +88,8 @@ export interface GenerateStats {
   buildingsWithInstallations: number;
   /** 窓・扉まである形（LOD3）で入れた建物の数 */
   lod3Buildings: number;
+  /** 3Dプリンタ用のとき：縮尺・印刷したときの大きさ（mm） */
+  print?: PrintInfo;
 }
 
 export interface GenerateResult {
@@ -99,6 +108,9 @@ export interface GenerateResult {
 
 /** 建物の細かさの名前（記録・出典の説明用） */
 export function detailLabel(req: AreaRequest): string {
+  if (req.print) {
+    return req.lod === 1 ? '箱型（LOD1）' : `屋根の形あり（LOD${req.lod === 3 ? '3 の屋根' : '2'}）`;
+  }
   if (req.lod === 1) return '箱型（LOD1）';
   if (req.lod === 3) {
     return `窓・扉まである形（LOD3。LOD3 のない建物は屋根の形〔LOD2〕で代用${req.installations ? '、付属物あり' : ''}）`;
@@ -108,12 +120,10 @@ export function detailLabel(req: AreaRequest): string {
 
 /** ファイル名に付ける細かさの印 */
 function detailCode(req: AreaRequest): string {
+  if (req.print) return `lod${req.lod}_print`;
   if (req.lod === 3) return req.installations ? 'lod3plus' : 'lod3';
   return req.lod === 1 ? 'lod1' : req.installations ? 'lod2plus' : 'lod2';
 }
-
-/** STL の先頭（80バイト・英数字のみ）に書く文。出典の全文は一緒に出すクレジットの文章ファイルにある */
-export const STL_HEADER = 'Made from Project PLATEAU 3D city model (MLIT Japan), modified. See credit.txt';
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -139,7 +149,8 @@ export async function generateFromPlan(
     projector,
     half: req.size / 2,
     lod: req.lod,
-    installations: req.lod >= 2 && req.installations === true,
+    installations: !req.print && req.lod >= 2 && req.installations === true,
+    solid: req.print !== undefined,
   });
   const used: UsedFile[] = [];
 
@@ -178,14 +189,23 @@ export async function generateFromPlan(
   if (scene.buildings.length === 0) {
     throw new Error('指定した範囲に建物が見つかりませんでした。場所か広さを変えてみてください。');
   }
-  if (req.includeGround) scene.addGround();
+  const print = req.print ? await finishForPrint(scene, req.size / 2, req.print) : undefined;
+  if (!req.print && req.includeGround) scene.addGround();
 
   onProgress({ ratio: 1, message: '3D モデルを作成中…' });
   const createdAt = today();
   const place = req.placeName?.trim() || `${req.center.lat.toFixed(5)},${req.center.lon.toFixed(5)}`;
   const detail = detailLabel(req);
   const description = `「${place}」を中心に一辺 ${req.size} m の範囲を切り出し（中心 緯度 ${req.center.lat.toFixed(6)}・経度 ${req.center.lon.toFixed(6)}）、${detail}の建物にする`;
-  const credit = buildCredit(used, { description, createdAt });
+  const processing = print
+    ? [
+        `3Dプリンタ用に、縮尺 ${print.scaleLabel}（印刷したときの大きさ 幅 ${print.widthMm} × 奥行き ${print.depthMm} × 高さ ${print.heightMm} mm）にする`,
+        '建物は屋根の面を真下へ押し出した閉じた形に作り直す（壁の細かな形・付属物・窓・扉は省く）',
+        `道路は厚さ ${ROAD_PRINT_MM} mm の板にする`,
+        ...(print.baseMm > 0 ? [`厚さ ${print.baseMm} mm の台座を加え、建物・道路の下端を台座に食い込ませる`] : []),
+      ]
+    : [];
+  const credit = buildCredit(used, { description, createdAt, processing });
 
   const extras = {
     plateau: {
@@ -206,18 +226,31 @@ export async function generateFromPlan(
         centerLon: req.center.lon,
         sizeMeters: req.size,
         lod: req.lod,
-        installations: req.lod >= 2 && req.installations === true,
-        origin: '範囲の中心・地面の高さ0。単位はメートル、+Y が上、-Z が北',
+        installations: !req.print && req.lod >= 2 && req.installations === true,
+        origin: print
+          ? '範囲の中心・台座の上面が高さ0。単位はメートル（縮尺をかけた大きさ）、+Y が上、-Z が北'
+          : '範囲の中心・地面の高さ0。単位はメートル、+Y が上、-Z が北',
+        ...(print
+          ? { print: { scale: print.scaleLabel, mmPerMeter: print.mmPerMeter, baseMm: print.baseMm, sizeMm: [print.widthMm, print.depthMm, print.heightMm] } }
+          : {}),
       },
       createdAt,
     },
   };
 
-  const glb = await buildGlb({ parts: scene.parts, copyright: credit.short, extras, name: `PLATEAU_${safeFileName(place)}` });
+  // 3Dプリンタ用：GLB はメートル（glTF の決まり）で縮尺をかけた大きさ、OBJ・STL はミリメートル（印刷ソフトの標準）
+  const glbParts = print ? scaleParts(scene.parts, print.mmPerMeter / 1000) : scene.parts;
+  const meshParts = print ? scaleParts(scene.parts, print.mmPerMeter) : scene.parts;
+  const glb = await buildGlb({ parts: glbParts, copyright: credit.short, extras, name: `PLATEAU_${safeFileName(place)}` });
   const fileName = `plateau_${safeFileName(place)}_${req.size}m_${detailCode(req)}`;
-  const obj = toObj(scene.parts, credit.text, `${fileName}.mtl`);
-  const mtl = toMtl(scene.parts, credit.text);
-  const stl = toStl(scene.parts, STL_HEADER);
+  const obj = toObj(
+    meshParts,
+    credit.text,
+    `${fileName}.mtl`,
+    print ? `単位：ミリメートル（縮尺 ${print.scaleLabel}）。+Y が上、-Z が北。範囲の中心が原点、台座の上面が高さ 0` : undefined,
+  );
+  const mtl = toMtl(meshParts, credit.text);
+  const stl = toStl(meshParts, stlHeader(`${fileName}_credit.txt`), print !== undefined);
 
   // 外形
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
@@ -255,6 +288,7 @@ export async function generateFromPlan(
       skippedBuildings: scene.skippedBuildings,
       buildingsWithInstallations: scene.buildingsWithInstallations,
       lod3Buildings: scene.lod3Buildings,
+      print,
     },
   };
 }
