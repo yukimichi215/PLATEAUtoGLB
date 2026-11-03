@@ -11,8 +11,13 @@
    - **屋根の形あり**（LOD2）：屋根の形が入る。少し重い
    - **屋根の形＋付属物**（LOD2）：ベランダ・ひさし・屋上の設備なども入る。重い（データのない地域もある）
    - 道路・地面の板を入れるかどうか
-3. 「3D モデルを作る」を押すと、必要な地域のデータだけを PLATEAU から取り、その場で 3D モデルにする
-4. 3D のプレビューで確かめて、形式を選んで保存
+3. 使いみちを選ぶ
+   - **そのまま**：実物の大きさ（メートル）。Blender などの編集ソフト・PlotBlock 向け
+   - **3D プリンタ用**：縮尺（1/500〜1/10000、または台座の一辺の長さ〔mm〕）と台座の厚さ（mm。0 で台座なし）を決める。
+     建物は屋根の面を真下に押し出した形に作り直し、道路（厚さ 0.4 mm の板）・台座と一緒に、穴やすき間のない1つの立体にまとめる
+     （付属物・窓・扉は細かすぎて印刷できないので入れない。範囲からはみ出した部分は切り落とし、台座はちょうど切り出した正方形）
+4. 「3D モデルを作る」を押すと、必要な地域のデータだけを PLATEAU から取り、その場で 3D モデルにする
+5. 3D のプレビューで確かめて、形式を選んで保存
    - **GLB**：色付き・1ファイル（PlotBlock・Web 向け）。中に出典を書いてある
    - **OBJ**：色付き（Blender などの編集ソフト向け）。`.obj`・色の設定 `.mtl`・出典の文章を zip にまとめて保存
    - **STL**：色なし（3D プリンタ向け）。`.stl` と出典の文章を zip にまとめて保存
@@ -23,6 +28,8 @@
 
 - 1つの `.glb` に全部入り（外部ファイルの参照なし）。Draco などの形の圧縮は使わない
 - 単位はメートル、上は +Y、北は -Z（OBJ・STL も GLB と同じ）。切り出した範囲の中心が原点、地面が高さ 0
+- 3D プリンタ用のとき：OBJ・STL はミリメートル（印刷ソフトの標準）、STL は上が +Z（北が +Y）。GLB は glTF の決まりどおりメートルで、縮尺をかけた大きさ。
+  台座の上面が高さ 0。建物・道路の下端は台座の厚さの半分まで食い込ませ、台座とつなげる
 - OBJ は同じ位置の頂点を1つにまとめ、部品（`o`）は GLB と同じ名前。STL はバイナリ形式で、先頭に出典が別ファイルにある旨を英字で書く
 - 建物の底の面は省いて三角形を減らす。模様（テクスチャ）は使わず、壁・屋根・付属物・道路・地面の色分け
 - 中身は「Buildings」「Roads」「Ground」の3つの部品
@@ -75,14 +82,15 @@ npm run dev
 | `npm run build` | 型チェックと公開用のファイル作成（`dist/`） |
 | `npm run cli -- --lat 35.6812 --lon 139.7671 --size 300 --lod 1 --name 東京駅` | コマンドで GLB を作る（`--format glb,obj,stl` で OBJ・STL も。出典の文章はいつも一緒に出す）（`--lod 2 --installations` で付属物、`--lod 3` で窓・扉〔試作〕）（取得したデータは `data/cache/` に保存。1ファイル200MB・合計1000MBを超えると中止） |
 | `npm run app:dev` / `npm run app:build` | Windows アプリ版の起動・ビルド（Rust と Tauri の準備が要る。通常は GitHub の自動ビルドで作る） |
-| `npm run verify -- out/xxx.glb out/xxx.obj out/xxx.stl` | GLB を glTF Validator と three.js で、OBJ・STL を three.js の OBJLoader・STLLoader で検査し、外形・三角形の数を表示 |
+| `npm run cli -- … --print --scale 1000 --base-mm 3`（または `--fit-mm 100`） | 3D プリンタ用（縮尺・台座・閉じた形）で作る |
+| `npm run verify -- out/xxx.glb out/xxx.obj out/xxx.stl` | GLB を glTF Validator と three.js で、OBJ・STL を three.js の OBJLoader・STLLoader で検査し、外形・三角形の数を表示。STL は印刷できる形か（開いた辺・3つ以上の面が共有する辺・部品の数・体積が正か・台座から浮いた部品）も表示 |
 
 PR を出す前の検証：`npm run typecheck`、`npm test`、`npm run build` がすべて通ること。
 GLB の出力を変えたときは、さらに実データで `npm run cli` と `npm run verify` を実行し、見た目に関わる変更は画面のプレビューのスクリーンショットで確かめる。
 
 構成：
 
-- `src/core/` … 画面とコマンドで共通の中身（場所→メッシュ番号、データカタログ、CityGML の読み取り、三角形分割、GLB 作成、OBJ・STL・zip の書き出し〔`export.ts`〕、出典）
+- `src/core/` … 画面とコマンドで共通の中身（場所→メッシュ番号、データカタログ、CityGML の読み取り、三角形分割、GLB 作成、OBJ・STL・zip の書き出し〔`export.ts`〕、3D プリンタ用の閉じた形〔`solid.ts`〕・縮尺と台座〔`print.ts`〕・1つの立体にまとめる計算〔`union.ts`。manifold-3d〕、出典）
 - `src/web/` … ブラウザの画面。重い処理は Web Worker（`worker.ts`）で行う
 - `scripts/` … コマンド（GLB 作成・検査）
 - `src-tauri/` … Windows アプリ版（Tauri）。画面は `dist/` をそのまま使い、保存だけ「名前を付けて保存」の窓（`save_file`）にする
