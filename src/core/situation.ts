@@ -1,17 +1,21 @@
-// シチュエーション検索：「都会の駅前」や作品のジャンル（古い木造の町並みなど）から、向いた地域の候補を出す。
-// 候補の地域は手で選んだ一覧。選んだ地域が本当に向いているかは、切り出した建物の属性
-// （建てた年・構造・用途・高さ・建物の密度）から出した「根拠の数値」で示す。
-// 町の雰囲気（「ほのぼの」など）は PLATEAU のデータにないので、属性での近似であることを画面に出す。
+// シチュエーション検索：「都会の駅前」や町並み（戸建て住宅地・団地など）から、向いた地域の候補を出す。
+// 候補の地域は手で選んだ一覧。選んだ地域が本当に向いているかは、切り出した建物の「見た目でわかる特徴」
+// （高さ・上から見た大きさ・密度・高さのばらつき）から出した「根拠の数値」で示す。
+// PLATEAU の形からは木造かどうか・古さ・町の雰囲気はわからないので、それで選ぶ条件は作らない。
+// 作品のジャンル（ホラーなど）の名前も付けない（建物の細かさが足りず、ジャンル向けとしては機能しないため。2026-11-03 利用者）。
 // 一般に公開するので、実在の町を悪く言う名前・説明にしない（候補は「データ上の特徴が近い例」として出す）。
 import type { LatLon } from './geo.js';
 
-/** 根拠の数値の計算に使う、建物1棟の属性（BuildingInfo の一部） */
+/** 根拠の数値の計算に使う、建物1棟の特徴（BuildingInfo の一部） */
 export interface CharacterInput {
   measuredHeight?: number;
-  yearOfConstruction?: number;
-  structureType?: string;
-  usage?: string;
+  /** 上から見た大きさ（m²） */
+  footprintM2?: number;
 }
+
+/** 小さな建物（戸建ての家くらい）・大きな建物（工場・倉庫・大きなビルくらい）の、上から見た大きさの境（m²） */
+export const SMALL_M2 = 150;
+export const LARGE_M2 = 1000;
 
 /** 切り出した範囲の建物の特徴（根拠の数値） */
 export interface AreaCharacter {
@@ -23,28 +27,22 @@ export interface AreaCharacter {
   /** 高さが分かる棟数と、その平均（m） */
   heightKnown: number;
   avgHeight?: number;
+  /**
+   * 小さな建物（SMALL_M2 未満。物置・車庫など）を除いた、高さが分かる棟数・高さのばらつき（標準偏差、m）・
+   * 中層（高さ 10m 以上 31m 未満。おおむね 3〜9 階建て）の棟数。団地のように同じくらいの建物が並ぶかを見る
+   */
+  mainKnown: number;
+  heightSd?: number;
+  mid: number;
   /** 高さ 31m 以上（おおむね 10 階建て以上）・60m 以上（超高層）の棟数 */
   tall31: number;
   tall60: number;
-  /** 建てた年が分かる棟数と、そのうち 1970 年以前・2000 年以降の棟数 */
-  yearKnown: number;
-  builtBy1970: number;
-  builtFrom2000: number;
-  /** 構造が分かる棟数（「不明」を除く）と、そのうち木造の棟数 */
-  structureKnown: number;
-  wooden: number;
-  /** 用途が分かる棟数（「不明」を除く）と、そのうち住宅（併用住宅を含む）の棟数 */
-  usageKnown: number;
-  residential: number;
+  /** 上から見た大きさが分かる棟数と、その平均（m²）。SMALL_M2 未満・LARGE_M2 以上の棟数 */
+  footprintKnown: number;
+  avgFootprint?: number;
+  small: number;
+  large: number;
 }
-
-/** 構造のコード。出典：PLATEAU 標準製品仕様書のコードリスト BuildingDetailAttribute_buildingStructureType（国土交通省）
- * https://www.mlit.go.jp/plateaudocument/toc4/toc4_02/toc4_02_04/toc4_02_04_02/BuildingDetailAttribute_buildingStructureType_xml */
-const WOODEN = '601'; // 木造・土蔵造
-const STRUCTURE_UNKNOWN = '611'; // 不明
-/** 用途のコードのうち住宅（住宅・共同住宅・店舗等併用住宅・店舗等併用共同住宅・作業所併用住宅） */
-const RESIDENTIAL = new Set(['411', '412', '413', '414', '415']);
-const USAGE_UNKNOWN = '461';
 
 export function areaCharacter(buildings: CharacterInput[], areaM2: number): AreaCharacter {
   const c: AreaCharacter = {
@@ -52,47 +50,52 @@ export function areaCharacter(buildings: CharacterInput[], areaM2: number): Area
     areaHa: areaM2 / 10000,
     density: areaM2 > 0 ? buildings.length / (areaM2 / 10000) : 0,
     heightKnown: 0,
+    mainKnown: 0,
+    mid: 0,
     tall31: 0,
     tall60: 0,
-    yearKnown: 0,
-    builtBy1970: 0,
-    builtFrom2000: 0,
-    structureKnown: 0,
-    wooden: 0,
-    usageKnown: 0,
-    residential: 0,
+    footprintKnown: 0,
+    small: 0,
+    large: 0,
   };
   let heightSum = 0;
+  let mainSum = 0;
+  let mainSq = 0;
+  let footSum = 0;
   for (const b of buildings) {
     if (b.measuredHeight !== undefined) {
       c.heightKnown++;
       heightSum += b.measuredHeight;
       if (b.measuredHeight >= 31) c.tall31++;
       if (b.measuredHeight >= 60) c.tall60++;
+      if (b.footprintM2 !== undefined && b.footprintM2 >= SMALL_M2) {
+        c.mainKnown++;
+        mainSum += b.measuredHeight;
+        mainSq += b.measuredHeight ** 2;
+        if (b.measuredHeight >= 10 && b.measuredHeight < 31) c.mid++;
+      }
     }
-    if (b.yearOfConstruction !== undefined) {
-      c.yearKnown++;
-      if (b.yearOfConstruction <= 1970) c.builtBy1970++;
-      if (b.yearOfConstruction >= 2000) c.builtFrom2000++;
-    }
-    if (b.structureType !== undefined && b.structureType !== STRUCTURE_UNKNOWN) {
-      c.structureKnown++;
-      if (b.structureType === WOODEN) c.wooden++;
-    }
-    if (b.usage !== undefined && b.usage !== USAGE_UNKNOWN) {
-      c.usageKnown++;
-      if (RESIDENTIAL.has(b.usage)) c.residential++;
+    if (b.footprintM2 !== undefined && b.footprintM2 > 0) {
+      c.footprintKnown++;
+      footSum += b.footprintM2;
+      if (b.footprintM2 < SMALL_M2) c.small++;
+      if (b.footprintM2 >= LARGE_M2) c.large++;
     }
   }
   if (c.heightKnown > 0) c.avgHeight = heightSum / c.heightKnown;
+  if (c.mainKnown > 0) {
+    const mean = mainSum / c.mainKnown;
+    c.heightSd = Math.sqrt(Math.max(0, mainSq / c.mainKnown - mean ** 2));
+  }
+  if (c.footprintKnown > 0) c.avgFootprint = footSum / c.footprintKnown;
   return c;
 }
 
 /** 根拠の数値の種類 */
-export type Metric = 'density' | 'avgHeight' | 'tall31' | 'tall60' | 'old' | 'new' | 'wooden' | 'residential';
+export type Metric = 'density' | 'avgHeight' | 'heightSd' | 'mid' | 'tall31' | 'tall60' | 'avgFootprint' | 'small' | 'large';
 
 /** 割合の母数の種類（「高さが分かる N 棟のうち」など） */
-export type Basis = 'all' | 'height' | 'year' | 'structure' | 'usage';
+export type Basis = 'all' | 'height' | 'main' | 'footprint';
 
 /** 根拠の数値（文にするのは画面の側。言語ごとに書き方が違うため） */
 export interface Evidence {
@@ -105,7 +108,7 @@ export interface Evidence {
   of: number;
   /** 割合（%、整数） */
   pct: number;
-  /** 密度（棟/ha）・平均の高さ（m）のときの値 */
+  /** 密度（棟/ha）・平均の高さ（m）・高さのばらつき（m）・平均の大きさ（m²）のときの値 */
   value?: number;
   /** 密度のときの範囲の広さ（ha） */
   areaHa?: number;
@@ -114,33 +117,36 @@ export interface Evidence {
 const BASIS: Record<Metric, Basis> = {
   density: 'all',
   avgHeight: 'height',
+  heightSd: 'main',
+  mid: 'main',
   tall31: 'height',
   tall60: 'height',
-  old: 'year',
-  new: 'year',
-  wooden: 'structure',
-  residential: 'usage',
+  avgFootprint: 'footprint',
+  small: 'footprint',
+  large: 'footprint',
 };
 
 export function evidenceOf(c: AreaCharacter, metric: Metric): Evidence {
   const basis = BASIS[metric];
-  const of = { all: c.buildings, height: c.heightKnown, year: c.yearKnown, structure: c.structureKnown, usage: c.usageKnown }[basis];
+  const of = { all: c.buildings, height: c.heightKnown, main: c.mainKnown, footprint: c.footprintKnown }[basis];
   const n = {
     density: c.buildings,
     avgHeight: c.heightKnown,
+    heightSd: c.mainKnown,
+    mid: c.mid,
     tall31: c.tall31,
     tall60: c.tall60,
-    old: c.builtBy1970,
-    new: c.builtFrom2000,
-    wooden: c.wooden,
-    residential: c.residential,
+    avgFootprint: c.footprintKnown,
+    small: c.small,
+    large: c.large,
   }[metric];
   const e: Evidence = { metric, basis, known: basis === 'all' || of > 0, n, of, pct: of > 0 ? Math.round((n / of) * 100) : 0 };
   if (metric === 'density') {
     e.value = c.density;
     e.areaHa = c.areaHa;
   }
-  if (metric === 'avgHeight' && c.avgHeight !== undefined) e.value = c.avgHeight;
+  const value = { avgHeight: c.avgHeight, heightSd: c.heightSd, avgFootprint: c.avgFootprint }[metric as 'avgHeight'];
+  if (value !== undefined) e.value = value;
   return e;
 }
 
@@ -158,8 +164,8 @@ export interface SituationPlace extends LatLon {
 
 export interface Situation {
   id: string;
-  /** 'station'：駅前の雰囲気、'genre'：作品のジャンル */
-  kind: 'station' | 'genre';
+  /** 'station'：駅前、'town'：町並み */
+  kind: 'station' | 'town';
   label: Text;
   /** どの属性で近似するか（画面に出す） */
   approximation: Text;
@@ -170,7 +176,8 @@ export interface Situation {
 
 // 候補の地域：PLATEAU の 3D 都市モデルがある自治体から選ぶ（scripts/check-situations.ts で
 // データカタログに建物のデータがあること・ファイルの大きさを確かめる）。
-// 座標は国土地理院の住所検索で駅名・地名を調べた位置（2026-11-03）。
+// 駅前の座標は国土地理院の住所検索で駅名・地名を調べた位置（2026-11-03）。
+// 町並み（戸建て住宅地・団地・工場・倉庫街・まばらな集落）は、PLATEAU のデータで 300m 四方ずつ数えて特徴が合う所を選んだ位置（地名は CityGML の住所。2026-11-03）。
 export const SITUATIONS: Situation[] = [
   {
     id: 'city-station',
@@ -191,8 +198,8 @@ export const SITUATIONS: Situation[] = [
     id: 'regional-station',
     kind: 'station',
     label: { ja: '地方都市の駅前', en: 'Regional-city station' },
-    approximation: { ja: '中くらいの高さの建物が多く、住宅も混ざる所', en: 'mostly mid-rise buildings mixed with houses' },
-    metrics: ['avgHeight', 'tall31', 'density', 'residential'],
+    approximation: { ja: '中くらいの高さの建物が多く、小さな家も混ざる所', en: 'mostly mid-rise buildings mixed with small houses' },
+    metrics: ['avgHeight', 'tall31', 'small', 'density'],
     places: [
       { name: { ja: '沼津駅（静岡県沼津市）', en: 'Numazu Station (Shizuoka)' }, lat: 35.1029, lon: 138.8606, note: { ja: '商店街と中層のビル', en: 'shopping streets and mid-rise buildings' } },
       { name: { ja: '金沢駅（石川県金沢市）', en: 'Kanazawa Station (Ishikawa)' }, lat: 36.5781, lon: 136.6476, note: { ja: '駅前のホテル・オフィス街', en: 'hotels and offices by the station' } },
@@ -204,10 +211,10 @@ export const SITUATIONS: Situation[] = [
     kind: 'station',
     label: { ja: '田舎の駅前', en: 'Countryside station' },
     approximation: {
-      ja: '低い建物と住宅が中心の所（地方都市の駅前は大きな建物が多いので、1 ha あたりの棟数は田舎の駅前のほうが多く出ることがある）',
-      en: 'mostly low buildings and houses (regional-city stations have many large buildings, so the number of buildings per ha can come out higher at a countryside station)',
+      ja: '低く小さな建物が中心の所（地方都市の駅前は大きな建物が多いので、1 ha あたりの棟数は田舎の駅前のほうが多く出ることがある）',
+      en: 'mostly low, small buildings (regional-city stations have many large buildings, so the number of buildings per ha can come out higher at a countryside station)',
     },
-    metrics: ['avgHeight', 'residential', 'wooden', 'density'],
+    metrics: ['avgHeight', 'small', 'density'],
     places: [
       { name: { ja: '大聖寺駅（石川県加賀市）', en: 'Daishoji Station (Kaga, Ishikawa)' }, lat: 36.3003, lon: 136.3143, note: { ja: '小さな町の駅前', en: 'small-town station' } },
       { name: { ja: '茅野駅（長野県茅野市）', en: 'Chino Station (Nagano)' }, lat: 35.995, lon: 138.1522, note: { ja: '高原の町の駅前', en: 'highland town station' } },
@@ -215,39 +222,54 @@ export const SITUATIONS: Situation[] = [
     ],
   },
   {
-    id: 'horror',
-    kind: 'genre',
-    label: { ja: '古い木造の町並み（ホラー・時代もの向き）', en: 'Old wooden townscape (for horror and period pieces)' },
-    approximation: { ja: '古い建物と木造の建物が多い所', en: 'many old and wooden buildings' },
-    metrics: ['old', 'wooden', 'avgHeight'],
+    id: 'detached-houses',
+    kind: 'town',
+    label: { ja: '戸建て住宅地', en: 'Detached-house neighborhood' },
+    approximation: { ja: '上から見て小さく、低い建物（家）が多く、密集している所', en: 'many small, low buildings (houses) packed closely together' },
+    metrics: ['small', 'avgHeight', 'density', 'avgFootprint'],
     places: [
-      { name: { ja: 'ひがし茶屋街（金沢市東山）', en: 'Higashi Chaya district (Kanazawa)' }, lat: 36.5714, lon: 136.6669, note: { ja: '古い木造の町並みが残る', en: 'an old wooden townscape remains' } },
-      { name: { ja: 'ペリーロード付近（下田市三丁目）', en: 'Near Perry Road (Shimoda)' }, lat: 34.6679, lon: 138.9451, note: { ja: '古い家が残る港町', en: 'port town with old houses' } },
-      { name: { ja: '旧城下町（加賀市大聖寺）', en: 'Old castle town (Daishoji, Kaga)' }, lat: 36.3047, lon: 136.3125, note: { ja: '古い家と寺が多い', en: 'many old houses and temples' } },
+      { name: { ja: '成城二丁目（東京都世田谷区）', en: 'Seijo 2-chome (Setagaya, Tokyo)' }, lat: 35.6374, lon: 139.5996, note: { ja: '低い戸建てが並ぶ住宅街', en: 'streets of low detached houses' } },
+      { name: { ja: '高野台五丁目（東京都練馬区）', en: 'Takanodai 5-chome (Nerima, Tokyo)' }, lat: 35.7484, lon: 139.611, note: { ja: '石神井公園駅の近くの住宅街', en: 'residential area near Shakujii-koen Station' } },
+      { name: { ja: '南荻窪四丁目（東京都杉並区）', en: 'Minami-Ogikubo 4-chome (Suginami, Tokyo)' }, lat: 35.7013, lon: 139.6142, note: { ja: '家が密集する住宅街', en: 'densely packed houses' } },
     ],
   },
   {
-    id: 'calm-residential',
-    kind: 'genre',
-    label: { ja: 'ほのぼの（静かな住宅街）', en: 'Slice of life (quiet residential area)' },
-    approximation: { ja: '住宅が多く、低い建物が中心の所', en: 'mostly houses and low buildings' },
-    metrics: ['residential', 'avgHeight', 'tall31', 'density'],
+    id: 'housing-estate',
+    kind: 'town',
+    label: { ja: '団地', en: 'Apartment complex' },
+    approximation: {
+      ja: '物置・自転車置き場などの小さな建物を除くと、中層（3〜9 階建てくらい）の建物が多く、高さがそろっている所',
+      en: 'excluding small sheds, mostly mid-rise buildings (about 3–9 floors) of similar height',
+    },
+    metrics: ['mid', 'heightSd', 'avgFootprint', 'density'],
     places: [
-      { name: { ja: '成城学園前駅（東京都世田谷区）', en: 'Seijogakuen-mae Station (Setagaya, Tokyo)' }, lat: 35.64, lon: 139.5989, note: { ja: '低い戸建てが並ぶ住宅街', en: 'streets of low detached houses' } },
-      { name: { ja: '石神井公園駅（東京都練馬区）', en: 'Shakujii-koen Station (Nerima, Tokyo)' }, lat: 35.7437, lon: 139.606, note: { ja: '公園のそばの住宅街', en: 'residential area near a park' } },
-      { name: { ja: '荻窪駅（東京都杉並区）', en: 'Ogikubo Station (Suginami, Tokyo)' }, lat: 35.7044, lon: 139.6202, note: { ja: '駅の周りに住宅が広がる', en: 'houses spread around the station' } },
+      { name: { ja: '高島平三丁目（東京都板橋区）', en: 'Takashimadaira 3-chome (Itabashi, Tokyo)' }, lat: 35.7863, lon: 139.6544, note: { ja: '同じ形の住棟が並ぶ', en: 'rows of identical apartment blocks' } },
+      { name: { ja: '高島平二丁目（東京都板橋区）', en: 'Takashimadaira 2-chome (Itabashi, Tokyo)' }, lat: 35.7848, lon: 139.66, note: { ja: '大きな団地の住棟', en: 'blocks of a large housing estate' } },
+      { name: { ja: '高島平八丁目（東京都板橋区）', en: 'Takashimadaira 8-chome (Itabashi, Tokyo)' }, lat: 35.7901, lon: 139.6605, note: { ja: '中層の集合住宅が多い', en: 'many mid-rise apartment buildings' } },
     ],
   },
   {
-    id: 'futuristic',
-    kind: 'genre',
-    label: { ja: '近未来（高層ビル街）', en: 'Near future (high-rise district)' },
-    approximation: { ja: '超高層ビルと、新しい建物の多さで近似', en: 'approximated by high-rises and the share of new buildings' },
-    metrics: ['tall60', 'avgHeight', 'new', 'tall31'],
+    id: 'industrial',
+    kind: 'town',
+    label: { ja: '工場・倉庫街', en: 'Factories and warehouses' },
+    approximation: { ja: '上から見て大きく、高さの低い（平たい）建物が多い所', en: 'many large, low (flat) buildings' },
+    metrics: ['large', 'avgFootprint', 'avgHeight', 'density'],
     places: [
-      { name: { ja: '都庁前駅（西新宿の高層ビル街）', en: 'Tochomae Station (Nishi-Shinjuku towers)' }, lat: 35.6904, lon: 139.6924, note: { ja: '超高層ビルが集まる', en: 'cluster of skyscrapers' } },
-      { name: { ja: '汐留駅（東京都港区）', en: 'Shiodome Station (Minato, Tokyo)' }, lat: 35.663, lon: 139.7603, note: { ja: '再開発の高層ビル群', en: 'redeveloped high-rise cluster' } },
-      { name: { ja: 'みなとみらい駅（横浜市）', en: 'Minatomirai Station (Yokohama)' }, lat: 35.4582, lon: 139.6319, note: { ja: '海沿いの新しい高層ビル街', en: 'new waterfront high-rise district' } },
+      { name: { ja: '東海三丁目（東京都大田区）', en: 'Tokai 3-chome (Ota, Tokyo)' }, lat: 35.5811, lon: 139.7634, note: { ja: '大きな倉庫が並ぶ', en: 'rows of large warehouses' } },
+      { name: { ja: '平和島二丁目（東京都大田区）', en: 'Heiwajima 2-chome (Ota, Tokyo)' }, lat: 35.5869, lon: 139.7463, note: { ja: '大きな物流の建物', en: 'large logistics buildings' } },
+      { name: { ja: '東海二丁目（東京都大田区）', en: 'Tokai 2-chome (Ota, Tokyo)' }, lat: 35.5798, lon: 139.7568, note: { ja: '埋め立て地の倉庫と工場', en: 'warehouses and factories on reclaimed land' } },
+    ],
+  },
+  {
+    id: 'sparse-village',
+    kind: 'town',
+    label: { ja: 'まばらな集落', en: 'Scattered village' },
+    approximation: { ja: '低い建物が、とてもまばらにある所', en: 'low buildings spread very thinly' },
+    metrics: ['density', 'avgHeight', 'small'],
+    places: [
+      { name: { ja: '更別村の郊外・南（北海道）', en: 'Outskirts of Sarabetsu, south (Hokkaido)' }, lat: 42.619, lon: 143.2188, note: { ja: '畑の中に家が点在する', en: 'houses dotted among fields' } },
+      { name: { ja: '更別村の郊外・北（北海道）', en: 'Outskirts of Sarabetsu, north (Hokkaido)' }, lat: 42.6311, lon: 143.2151, note: { ja: '広い畑と農家', en: 'wide fields and farmhouses' } },
+      { name: { ja: '浮羽町小塩（福岡県うきは市）', en: 'Ukiha-machi Koshio (Ukiha, Fukuoka)' }, lat: 33.3063, lon: 130.8445, note: { ja: '山あいの小さな集落', en: 'small mountain hamlet' } },
     ],
   },
 ];

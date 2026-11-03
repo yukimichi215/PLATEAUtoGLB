@@ -336,9 +336,9 @@ function renderSituationSelect(): void {
   none.value = '';
   none.textContent = t('situation.choose');
   situationSelect.append(none);
-  for (const kind of ['station', 'genre'] as const) {
+  for (const kind of ['station', 'town'] as const) {
     const group = document.createElement('optgroup');
-    group.label = t(kind === 'station' ? 'situation.group.station' : 'situation.group.genre');
+    group.label = t(kind === 'station' ? 'situation.group.station' : 'situation.group.town');
     for (const s of SITUATIONS.filter((x) => x.kind === kind)) {
       const o = document.createElement('option');
       o.value = s.id;
