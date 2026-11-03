@@ -156,6 +156,8 @@ function updatePrintUi(): void {
   groundEl.disabled = print;
   // 3Dプリンタ用は1つの立体にまとめるので、建物を分ける選択は出さない
   modelOptionsEl.hidden = print;
+  // 3D プリンタ用では付属物・窓・扉は細かすぎて入れないので、屋根の形と同じになることを添える
+  for (const el of document.querySelectorAll<HTMLElement>('.print-same')) el.hidden = !print;
   overhangHint.hidden = print;
   if (!print) return;
   const size = Number(sizeEl.value);
@@ -179,7 +181,8 @@ function currentRequest(): AreaRequest {
     center: { lat: selected!.lat, lon: selected!.lon },
     size: Number(sizeEl.value),
     lod: detail === 'box' ? 1 : detail === 'lod3' ? 3 : 2,
-    installations: detail === 'roofPlus',
+    // 窓・扉まで（LOD3）にも付属物を入れる。LOD3 のない建物は「屋根の形＋付属物」で代わりに作るので、それより粗くならない
+    installations: detail === 'roofPlus' || detail === 'lod3',
     includeRoads: roadsEl.checked,
     includeGround: groundEl.checked,
     placeName: selected!.title,

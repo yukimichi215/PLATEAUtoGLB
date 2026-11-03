@@ -52,8 +52,8 @@
             <legend>建物の細かさ</legend>
             <label class="inline"><input type="radio" name="detail" value="box" checked /> 箱型（いちばん軽い）</label>
             <label class="inline"><input type="radio" name="detail" value="roof" /> 屋根の形あり</label>
-            <label class="inline"><input type="radio" name="detail" value="roofPlus" /> 屋根の形＋付属物（重い）</label>
-            <label class="inline"><input type="radio" name="detail" value="lod3" /> 窓・扉まで（とても重い。一部の地域だけ）</label>
+            <label class="inline"><input type="radio" name="detail" value="roofPlus" /> <span>屋根の形＋付属物（重い）<span class="print-same" hidden>（3D プリンタ用では「屋根の形あり」と同じ）</span></span></label>
+            <label class="inline"><input type="radio" name="detail" value="lod3" /> <span>窓・扉まで＋付属物（とても重い。一部の地域だけ）<span class="print-same" hidden>（3D プリンタ用では「屋根の形あり」と同じ）</span></span></label>
           </fieldset>
           <fieldset>
             <legend>建物以外</legend>
@@ -64,7 +64,7 @@
         <p class="hint">
           下ほど細かく、ファイルが大きくなります。スマホ向けには「箱型」がおすすめです。
           付属物はベランダ・ひさし・屋上の設備などで、データのない地域もあります。
-          窓・扉まであるデータ（LOD3）は沼津駅前・虎ノ門など一部の建物だけで、ない建物は屋根の形・箱型で代わりに作ります（その数を表示します）。
+          窓・扉まであるデータ（LOD3）は沼津駅前・虎ノ門など一部の建物だけで、ない建物は屋根の形（付属物あり）・箱型で代わりに作ります（その数を表示します）。3D プリンタ用では、付属物・窓・扉は細かすぎるので入れません。
         </p>
         <fieldset class="use">
           <legend>使いみち</legend>

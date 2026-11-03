@@ -45,6 +45,12 @@ describe('細かさの選択', () => {
     const t2p = await make(TOKYO, { lod: 2, installations: true });
     expect(t1.stats.triangles).toBeLessThan(t2.stats.triangles);
     expect(t2.stats.triangles).toBeLessThan(t2p.stats.triangles);
+    // 画面の「窓・扉まで」は付属物も入れる。LOD3 のない東京でも「付属物あり」より粗くならない
+    const t3p = await make(TOKYO, { lod: 3, installations: true });
+    expect(t3p.stats.triangles).toBeGreaterThanOrEqual(t2p.stats.triangles);
+    const lod3p = await make(NUMAZU, { lod: 3, installations: true });
+    expect(lod3p.stats.triangles).toBeGreaterThanOrEqual(plus.stats.triangles);
+    expect(lod3p.stats.triangles).toBeGreaterThanOrEqual(lod3.stats.triangles);
   });
 
   it('LOD3 のある見本では窓・扉が入り、代わりに作った建物は 0', async () => {
