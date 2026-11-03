@@ -51,7 +51,8 @@ export class Preview {
     const center = box.getCenter(new Vector3());
     const radius = Math.max(size.x, size.z, size.y) * 0.6;
     this.camera.position.set(center.x + radius, center.y + radius * 0.9, center.z + radius);
-    this.camera.near = Math.max(0.1, radius / 1000);
+    // 3Dプリンタ用の GLB は縮尺をかけた大きさ（数 cm）なので、近くを切る距離も大きさに合わせる
+    this.camera.near = radius / 1000;
     this.camera.far = radius * 20;
     this.camera.updateProjectionMatrix();
     this.controls.target.copy(center);
