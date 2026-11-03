@@ -129,7 +129,12 @@
       <section id="result" class="card" aria-labelledby="h-result" hidden>
         <h2 id="h-result"><span class="step">4</span>できあがり</h2>
         <div id="preview" class="preview" aria-label="3D プレビュー（ドラッグで回転・ホイールで拡大）"></div>
-        <p class="hint">ドラッグで回転、ホイール（2本指）で拡大・縮小できます。</p>
+        <div class="row view-buttons" role="group" aria-label="見る向き">
+          <button type="button" data-view="angle">斜めから</button>
+          <button type="button" data-view="top">真上から</button>
+          <button type="button" data-view="front">正面（南）から</button>
+        </div>
+        <p class="hint">ドラッグで回転、右ドラッグ（2本指）で移動、ホイール（ピンチ）で拡大・縮小できます。保存する前に、選んだ縮尺・台座・高さの強調がどう出るかをここで確かめられます。</p>
         <dl id="stats" class="stats"></dl>
         <div class="row">
           <a id="dl-glb" class="button primary" download>GLB を保存</a>

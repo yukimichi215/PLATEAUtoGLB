@@ -92,3 +92,12 @@ export function meshCodesForBox(box: LatLonBox): string[] {
   }
   return [...codes].sort();
 }
+
+/** 3次メッシュの番号（8桁）の範囲（南西・北東） */
+export function meshBox(code: string): LatLonBox {
+  const p = Number(code.slice(0, 2)), u = Number(code.slice(2, 4));
+  const q = Number(code[4]), v = Number(code[5]), r = Number(code[6]), w = Number(code[7]);
+  const south = p / 1.5 + q / 12 + r / 120;
+  const west = 100 + u + v / 8 + w / 80;
+  return { south, west, north: south + 1 / 120, east: west + 1 / 80 };
+}

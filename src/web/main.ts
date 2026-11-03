@@ -4,7 +4,7 @@ import { searchPlace, type Place } from '../core/geocode.js';
 import type { AreaPlan, AreaRequest, DownloadKind } from '../core/pipeline.js';
 import type { PrintOptions } from '../core/print.js';
 import { AreaMap, type AreaMode, type DrawState } from './area-map.js';
-import { Preview } from './preview.js';
+import { Preview, type ViewName } from './preview.js';
 import type { WorkerRequest, WorkerResponse } from './worker.js';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -136,9 +136,13 @@ function onDrawChange(s: DrawState): void {
 }
 
 function drawHint(s: DrawState): string {
-  if (s.issue === 'crossing') return '線が交差しています。「描き直す」で、線が交差しないように囲み直してください。';
+  if (s.issue === 'tooSmall') return '囲んだ形の面積がほぼありません。「描き直す」で、点が一直線に並ばないように囲み直してください。';
+  if (s.issue === 'crossing') return '線が交差しているか、1点で触れています。「描き直す」で、線が交差・接しないように囲み直してください。';
   if (s.issue === 'tooLarge') return `囲んだ範囲が大きすぎます（一辺 ${MAX_SIZE} m の正方形に入る大きさまで。今は約 ${s.size} m）。`;
-  if (s.polygon) return `囲んだ範囲：一辺 約 ${s.size} m の正方形に入る大きさ（${s.polygon.length} 点）。描き直すときは「描き直す」を押します。`;
+  if (s.polygon) {
+    return `囲んだ範囲：一辺 約 ${s.size} m の正方形に入る大きさ（${s.polygon.length} 点）。描き直すときは「描き直す」を押します。` +
+      '囲んだ線にかかる大きな建物も、中心が中にあれば丸ごと入るので、線より少し大きく出ることがあります。';
+  }
   if (s.mode === 'rect') return '地図の上で、押したまま動かして四角を描きます（このあいだ地図はドラッグで動かせません。拡大・縮小はホイール・2本指・＋−で）。';
   if (s.mode === 'polygon') {
     return s.drawingPoints === 0
@@ -370,7 +374,7 @@ makeBtn.addEventListener('click', async () => {
     }
     resultEl.hidden = false;
     preview ??= new Preview($('preview'));
-    await preview.show(res.glb);
+    await preview.show(res.glb, { print: s.print !== undefined });
     resultEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
   } catch (e) {
     showMessage(e instanceof Error ? e.message : String(e), true);
@@ -379,6 +383,11 @@ makeBtn.addEventListener('click', async () => {
     setBusy(false);
   }
 });
+
+// プレビューの見る向き
+for (const btn of document.querySelectorAll<HTMLButtonElement>('.view-buttons button')) {
+  btn.addEventListener('click', () => preview?.setView(btn.dataset.view as ViewName));
+}
 
 clearCacheBtn.addEventListener('click', async () => {
   await call({ type: 'clearCache' });

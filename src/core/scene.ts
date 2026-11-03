@@ -4,7 +4,7 @@ import { LocalProjector } from './geo.js';
 import earcut from 'earcut';
 import { clipPolygonByRing, clipRingToSquare, pointInRing, triangulatePolygon } from './geometry.js';
 import { extrudeDown, footprintArea, MIN_FOOTPRINT_M2, type Solid } from './solid.js';
-import { usageName } from './usage.js';
+import { knownUsageCode, usageName } from './usage.js';
 
 export type PartName = 'wall' | 'roof' | 'detail' | 'window' | 'door' | 'road' | 'ground';
 export type Parts = Record<PartName, MeshPart>;
@@ -109,7 +109,7 @@ export interface SceneOptions {
 export interface BuildingInfo {
   id: string;
   buildingId?: string;
-  /** 用途のコード（PLATEAU のコードリスト。例：431） */
+  /** 用途のコード（PLATEAU のコードリスト。例：431。「不明」（461）のときはなし。表にないコードもそのまま） */
   usage?: string;
   /** 用途の名前（例：運輸倉庫施設。「不明」・知らないコードのときはなし） */
   usageName?: string;
@@ -254,12 +254,11 @@ export class SceneBuilder {
    * 高さは PLATEAU の計測値（measuredHeight）と、この 3D モデルでの高さ（modelHeight。高さの強調をかけたあと）の両方
    */
   private pieceExtras(info: BuildingInfo): Record<string, unknown> {
-    const usageKnown = info.usageName !== undefined;
     const all: Record<string, unknown> = {
       plateauId: info.id,
       buildingId: info.buildingId,
       name: info.name,
-      usage: usageKnown ? info.usage : undefined,
+      usage: info.usage,
       usageName: info.usageName,
       yearOfConstruction: info.yearOfConstruction,
       storeysAboveGround: info.storeys,
@@ -414,7 +413,7 @@ export class SceneBuilder {
     this.buildings.push({
       id: b.id,
       buildingId: b.attrs.buildingId,
-      usage: b.attrs.usage,
+      usage: knownUsageCode(b.attrs.usage),
       usageName: usageName(b.attrs.usage),
       measuredHeight: b.attrs.measuredHeight,
       modelHeight: Math.round(height * 100) / 100,

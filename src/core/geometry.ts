@@ -190,22 +190,46 @@ export function pointInRing(x: number, z: number, ring: number[]): boolean {
   return inside;
 }
 
-/** 多角形の辺どうしが交わっていないか（となりの辺は除く）。交わっていれば囲んだ範囲として使えない */
+/** 線分 ab と cd が交わるか、触れているか（端が相手の線の上に乗る・重なるときも true） */
+export function segmentsTouch(a: [number, number], b: [number, number], c: [number, number], d: [number, number]): boolean {
+  const cross = (o: [number, number], p: [number, number], q: [number, number]) =>
+    (p[0] - o[0]) * (q[1] - o[1]) - (p[1] - o[1]) * (q[0] - o[0]);
+  // 誤差を見込んだ「ほぼ 0」（長さの2乗に比べて十分小さい）
+  const eps = 1e-9 * Math.max(1, Math.abs(b[0] - a[0]) + Math.abs(b[1] - a[1]) + Math.abs(d[0] - c[0]) + Math.abs(d[1] - c[1])) ** 2;
+  const sign = (v: number) => (v > eps ? 1 : v < -eps ? -1 : 0);
+  const d1 = sign(cross(c, d, a)), d2 = sign(cross(c, d, b)), d3 = sign(cross(a, b, c)), d4 = sign(cross(a, b, d));
+  if (d1 * d2 < 0 && d3 * d4 < 0) return true;
+  // 一直線上・端が乗っているとき：点が線分の範囲（外接する四角）の中にあるか
+  const onSeg = (p: [number, number], q: [number, number], r: [number, number]) =>
+    Math.min(p[0], q[0]) - 1e-9 <= r[0] && r[0] <= Math.max(p[0], q[0]) + 1e-9 &&
+    Math.min(p[1], q[1]) - 1e-9 <= r[1] && r[1] <= Math.max(p[1], q[1]) + 1e-9;
+  return (d1 === 0 && onSeg(c, d, a)) || (d2 === 0 && onSeg(c, d, b)) || (d3 === 0 && onSeg(a, b, c)) || (d4 === 0 && onSeg(a, b, d));
+}
+
+/**
+ * 多角形の辺どうしが交わっていないか（となりの辺は除く）。交わる・1点で触れる（砂時計の形など）なら囲んだ範囲として使えない
+ */
 export function isSimpleRing(ring: number[]): boolean {
   const n = ring.length / 2;
   if (n < 3) return false;
   const p = (i: number): [number, number] => [ring[(i % n) * 2]!, ring[(i % n) * 2 + 1]!];
-  const cross = (o: [number, number], a: [number, number], b: [number, number]) =>
-    (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
   for (let i = 0; i < n; i++) {
     for (let j = i + 1; j < n; j++) {
       if (j === i + 1 || (i === 0 && j === n - 1)) continue; // となりの辺
-      const a = p(i), b = p(i + 1), c = p(j), d = p(j + 1);
-      const d1 = cross(c, d, a), d2 = cross(c, d, b), d3 = cross(a, b, c), d4 = cross(a, b, d);
-      if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) return false;
+      if (segmentsTouch(p(i), p(i + 1), p(j), p(j + 1))) return false;
     }
   }
   return true;
+}
+
+/** 多角形の面積（2次元 [x, z, ...]。向きによらず正） */
+export function ringArea(ring: number[]): number {
+  let twice = 0;
+  for (let i = 0, n = ring.length / 2; i < n; i++) {
+    const j = (i + 1) % n;
+    twice += ring[i * 2]! * ring[j * 2 + 1]! - ring[j * 2]! * ring[i * 2 + 1]!;
+  }
+  return Math.abs(twice) / 2;
 }
 
 /** 凸多角形 clip（反時計回りでも時計回りでもよい）で、多角形 subject を切り取る（Sutherland–Hodgman 法） */
