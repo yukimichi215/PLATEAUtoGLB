@@ -3,6 +3,7 @@ import type { Building, Lod3Kind, Polygon, Road } from './citygml.js';
 import { LocalProjector } from './geo.js';
 import { clipRingToSquare, triangulatePolygon } from './geometry.js';
 import { extrudeDown, footprintArea, MIN_FOOTPRINT_M2, type Solid } from './solid.js';
+import { usageName } from './usage.js';
 
 export type PartName = 'wall' | 'roof' | 'detail' | 'window' | 'door' | 'road' | 'ground';
 export type Parts = Record<PartName, MeshPart>;
@@ -18,6 +19,8 @@ export interface ModelPiece {
   name: string;
   group: GroupName;
   parts: Parts;
+  /** GLB のノードの extras に入れる情報（建物を1棟ずつ分けたときの、建物の名前・用途など） */
+  extras?: Record<string, unknown>;
 }
 
 /** 1種類の材質で描く三角形の集まり。法線は面ごと（角ばったローポリの見た目） */
@@ -100,7 +103,10 @@ export interface SceneOptions {
 export interface BuildingInfo {
   id: string;
   buildingId?: string;
+  /** 用途のコード（PLATEAU のコードリスト。例：431） */
   usage?: string;
+  /** 用途の名前（例：運輸倉庫施設。「不明」・知らないコードのときはなし） */
+  usageName?: string;
   measuredHeight?: number;
   /** GLB の中での高さ（m） */
   modelHeight: number;
@@ -207,9 +213,13 @@ export class SceneBuilder {
     ];
   }
 
-  /** 建物の部品の名前。PLATEAU の建物 ID（なければ元データの ID）。重なったら番号を付ける */
-  private pieceName(b: Building): string {
-    const base = b.attrs.buildingId || b.id || 'building';
+  /**
+   * 建物の部品の名前。PLATEAU の建物 ID（なければ元データの ID）。名前のある建物は「名前_ID」。
+   * 重なったら番号を付ける
+   */
+  private pieceName(info: BuildingInfo): string {
+    const id = info.buildingId || info.id || 'building';
+    const base = info.name ? `${info.name}_${id}` : id;
     let name = base;
     for (let i = 2; this.pieceNames.has(name); i++) name = `${base}_${i}`;
     this.pieceNames.add(name);
@@ -231,6 +241,29 @@ export class SceneBuilder {
   keepRoads(keep: boolean[]): void {
     if (keep.length !== this.solidRoadOf.length) throw new Error('道路の形と一覧の数が合いません');
     this.roadCount = new Set(this.solidRoadOf.filter((_, i) => keep[i])).size;
+  }
+
+  /**
+   * 建物の部品の extras。データにある項目だけを入れる（ない項目は作らない）。
+   * 高さは PLATEAU の計測値（measuredHeight）と、この 3D モデルでの高さ（modelHeight。高さの強調をかけたあと）の両方
+   */
+  private pieceExtras(info: BuildingInfo): Record<string, unknown> {
+    const usageKnown = info.usageName !== undefined;
+    const all: Record<string, unknown> = {
+      plateauId: info.id,
+      buildingId: info.buildingId,
+      name: info.name,
+      usage: usageKnown ? info.usage : undefined,
+      usageName: info.usageName,
+      yearOfConstruction: info.yearOfConstruction,
+      storeysAboveGround: info.storeys,
+      measuredHeight: info.measuredHeight,
+      modelHeight: info.modelHeight,
+      heightScale: this.heightScale !== 1 ? this.heightScale : undefined,
+      cityCode: info.city,
+      lodUsed: info.lodUsed,
+    };
+    return Object.fromEntries(Object.entries(all).filter(([, v]) => v !== undefined && v !== ''));
   }
 
   /** 緯度経度の多角形をローカル座標（x, 標高, z）にする */
@@ -347,8 +380,11 @@ export class SceneBuilder {
     }
 
     if (useLod3) this.lod3Buildings++;
-    if (this.opt.separate) this.buildingPieces.push({ name: this.pieceName(b), group: 'Buildings', parts: target });
     this.recordBuilding(b, cx, cz, (maxY - minY) * this.heightScale, useLod3 ? 3 : useLod2 ? 2 : 1, installationFaces);
+    if (this.opt.separate) {
+      const info = this.buildings[this.buildings.length - 1]!;
+      this.buildingPieces.push({ name: this.pieceName(info), group: 'Buildings', parts: target, extras: this.pieceExtras(info) });
+    }
     return true;
   }
 
@@ -372,6 +408,7 @@ export class SceneBuilder {
       id: b.id,
       buildingId: b.attrs.buildingId,
       usage: b.attrs.usage,
+      usageName: usageName(b.attrs.usage),
       measuredHeight: b.attrs.measuredHeight,
       modelHeight: Math.round(height * 100) / 100,
       storeys: b.attrs.storeysAboveGround,

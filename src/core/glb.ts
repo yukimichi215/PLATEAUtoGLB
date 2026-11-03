@@ -109,7 +109,10 @@ export async function buildGlb(input: GlbInput): Promise<Uint8Array> {
     const groupNode = doc.createNode(group.name);
     for (const piece of pieces) {
       const mesh = meshOf(piece.name, piece.parts, group.parts);
-      if (mesh) groupNode.addChild(doc.createNode(piece.name).setMesh(mesh));
+      if (!mesh) continue;
+      const node = doc.createNode(piece.name).setMesh(mesh);
+      if (piece.extras) node.setExtras(piece.extras);
+      groupNode.addChild(node);
     }
     if (groupNode.listChildren().length > 0) root.addChild(groupNode);
     else groupNode.dispose();
