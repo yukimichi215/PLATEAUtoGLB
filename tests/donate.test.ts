@@ -27,7 +27,7 @@ describe('寄付ボタン', () => {
     expect(donateLinks(both, 'ja', label('ja')).map((l) => l.service)).toEqual(['ofuse', 'githubSponsors']);
     expect(donateLinks(both, 'en', label('en')).map((l) => l.service)).toEqual(['githubSponsors', 'ofuse']);
     expect(donateLinks(both, 'en-US', label('en'))[0]!.label).toBe('Sponsor on GitHub');
-    expect(donateLinks(both, 'ja', label('ja'))[0]!.label).toBe('OFUSE で応援');
+    expect(donateLinks(both, 'ja', label('ja'))[0]!.label).toBe('OFUSEで応援を送る');
   });
 
   it('https 以外の URL は使わない', () => {

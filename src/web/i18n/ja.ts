@@ -5,7 +5,7 @@ export const ja = {
     '住所や地名から、その周りの建物を 3D モデル（GLB・OBJ・STL）にします。3D プリンタ・編集ソフト・PlotBlock などで使えます（データ：国土交通省 PLATEAU）。',
   'lang.label': '表示する言語',
   'donate.aria': 'このツールを応援する',
-  'donate.ofuse': 'OFUSE で応援',
+  'donate.ofuse': 'OFUSEで応援を送る',
   'donate.githubSponsors': 'GitHub Sponsors で応援',
 
   'step1.title': '場所を探す',

@@ -42,6 +42,14 @@ export function readPackageLicense(name: string, root = process.cwd()): PackageL
 }
 
 /** ライセンス一覧の文章。許されていないライセンス・本文のないものがあればエラーにする */
+/** npm の部品以外に同梱している素材（MIT の対象外のもの） */
+const OTHER_ASSETS = [
+  'npm の部品以外の素材 / Other bundled assets',
+  '- OFUSE のアイコン（寄付ボタン）/ OFUSE icon (donation button): © 株式会社Sozi (Sozi Inc.), OFUSE KIT.',
+  '  OFUSE KIT の利用条件に従って改変せずに使用。MIT ライセンスの対象外・再配布や転用は不可。OFUSE・株式会社Sozi がこのツールを推薦・後援しているわけではありません。',
+  '  Used unmodified under the OFUSE KIT terms of use. Not covered by the MIT license; do not redistribute or reuse. OFUSE and Sozi Inc. do not endorse or sponsor this tool.',
+];
+
 export function licenseText(names: Iterable<string>, root = process.cwd()): string {
   const list = [...new Set(names)].sort().map((n) => readPackageLicense(n, root));
   const bad = list.filter((p) => !ALLOWED_LICENSES.includes(p.license) || p.texts.length === 0);
@@ -52,6 +60,8 @@ export function licenseText(names: Iterable<string>, root = process.cwd()): stri
     'PLATEAUtoGLB に組み込んでいる部品のライセンス / Licenses of the third-party packages bundled in PLATEAUtoGLB',
     '',
     ...list.map((p) => `- ${p.name} ${p.version} (${p.license})${p.homepage ? ` ${p.homepage}` : ''}`),
+    '',
+    ...OTHER_ASSETS,
     '',
   ];
   for (const p of list) {
