@@ -40,6 +40,8 @@ body {
 .donate-button { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border: 1px solid var(--muted); border-radius: 999px; color: var(--text); font-size: .8rem; text-decoration: none; }
 .donate-button:hover { border-color: var(--text); }
 .donate-button svg { color: #d6457a; }
+/* 狭い画面では題名の下に折り返すので、下の説明文と詰まらないよう少しあける */
+@media (max-width: 600px) { .top-tools { margin-bottom: 8px; } }
 .lead { margin: 0 0 16px; color: var(--muted); }
 .card {
   background: var(--card);
