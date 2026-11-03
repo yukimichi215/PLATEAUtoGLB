@@ -1,13 +1,16 @@
 // 対応地域の一覧（PLATEAU の建物モデルがある自治体）。中身は scripts/make-city-list.ts が作る city-list.json。
 // 一覧は小さい（数十KB）ので、その場で約10MB のデータセット一覧を取るより、作っておいたものを同梱する。
 
-/** LOD3（窓・扉まで）のデータがある場所（3次メッシュ、約1km 四方）の候補 */
+/** LOD3（窓・扉まで）のデータがある場所の候補。位置は、その3次メッシュ（約1km 四方）の中で LOD3 の建物が集まっている所 */
 export interface Lod3Place {
   mesh: string;
   lat: number;
   lon: number;
   /** そのメッシュの建物のファイルの大きさ（MB、展開後） */
   mb: number;
+  /** この位置を中心にした一辺 300m の正方形に入る、LOD3（窓・扉まで）の建物の数。そのメッシュのファイルだけで数えるので、
+   *  正方形がとなりのメッシュにかかると実際はもっと入る（画面では「◯棟以上」と出す） */
+  lod3Count: number;
 }
 
 export interface CityEntry {
@@ -23,6 +26,8 @@ export interface CityEntry {
   lod3: boolean;
   lod3Meshes?: number;
   lod3Places?: Lod3Place[];
+  /** LOD3 の候補の場所がないときの理由。tooLarge：ファイルが大きすぎる、notChecked：読む量の上限で調べきれなかった、noLod3：LOD3 の建物が見つからなかった */
+  lod3NoPlace?: 'tooLarge' | 'notChecked' | 'noLod3';
   /** データの年度（いちばん新しいもの） */
   year: number;
 }
