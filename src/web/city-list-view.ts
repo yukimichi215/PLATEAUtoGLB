@@ -80,7 +80,7 @@ export class CityListView {
         const pli = document.createElement('li');
         const pb = document.createElement('button');
         pb.type = 'button';
-        pb.textContent = t('cities.lod3Place', { i: i + 1, mb: Math.max(1, p.mb) });
+        pb.textContent = t('cities.lod3Place', { i: i + 1, count: p.lod3Count, mb: Math.max(1, p.mb) });
         pb.addEventListener('click', () => this.handlers.onLod3Place(c, p, i));
         pli.appendChild(pb);
         sub.appendChild(pli);

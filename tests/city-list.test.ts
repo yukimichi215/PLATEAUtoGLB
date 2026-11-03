@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import listJson from '../src/web/city-list.json';
 import { groupByPref, PREF_ROMAJI, type CityList } from '../src/web/city-list.js';
-import { meshBox, meshCode3 } from '../src/core/geo.js';
+import { meshCode3 } from '../src/core/geo.js';
 
 const list = listJson as CityList;
 
@@ -42,13 +42,13 @@ describe('対応地域の一覧', () => {
     expect(lod3.length).toBeLessThan(lod2.length);
   });
 
-  it('LOD3 の場所は、その区画（3次メッシュ）の中心で、200MB 以下', () => {
+  it('LOD3 の場所は、その区画（3次メッシュ）の中で LOD3 の建物が集まっている所で、200MB 以下', () => {
     for (const c of list.cities) {
       for (const p of c.lod3Places ?? []) {
         expect(c.lod3).toBe(true);
         expect(meshCode3(p.lat, p.lon)).toBe(p.mesh);
-        const b = meshBox(p.mesh);
-        expect(Math.abs(p.lat - (b.south + b.north) / 2)).toBeLessThan(1e-4);
+        // その位置を中心にした 300m の正方形に、LOD3 の建物が1棟以上ある（区画の中心ではなく、建物のある所を選ぶ）
+        expect(p.lod3Count).toBeGreaterThan(0);
         expect(p.mb).toBeLessThanOrEqual(200);
       }
     }
