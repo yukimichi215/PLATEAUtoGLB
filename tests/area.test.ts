@@ -2,8 +2,8 @@ import { createReadStream } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { checkMesh } from '../scripts/lib/check-mesh.js';
 import type { SourceFile } from '../src/core/catalog.js';
-import { LocalProjector, meshCodesForBox, metersPerDegree, type LatLon } from '../src/core/geo.js';
-import { polygonBox, polygonIssue } from '../src/core/area.js';
+import { LocalProjector, meshBox, meshCode3, meshCodesForBox, metersPerDegree, type LatLon } from '../src/core/geo.js';
+import { meshCodesForPolygon, polygonBox, polygonIssue } from '../src/core/area.js';
 import { clipPolygonByRing, isSimpleRing, pointInRing } from '../src/core/geometry.js';
 import { areaOfPolygon, generateFromPlan, validateRequest, type AreaPlan, type AreaRequest, type OpenText } from '../src/core/pipeline.js';
 
@@ -56,6 +56,31 @@ describe('囲んだ範囲の計算', () => {
     expect(polygonIssue(toLatLon([[0, 0], [100, 100], [100, 0], [0, 100]]))).toBe('crossing');
     expect(polygonIssue(toLatLon([[-600, -100], [600, -100], [600, 100], [-600, 100]]))).toBe('tooLarge');
     expect(polygonIssue(toLatLon([[-499, -100], [499, -100], [499, 100], [-499, 100]]))).toBeUndefined();
+    // 3点が一直線（面積がほぼない）
+    expect(polygonIssue(toLatLon([[0, 0], [50, 0], [100, 0]]))).toBe('tooSmall');
+    // 1点で触れる（砂時計の形：2つの三角形が点 (0, 0) で接する）
+    expect(polygonIssue(toLatLon([[0, 0], [-50, -50], [50, -50], [0, 0], [50, 50], [-50, 50]]))).toBe('crossing');
+    // 点が別の辺の上に乗る
+    expect(polygonIssue(toLatLon([[0, 0], [100, 0], [100, 100], [50, 0], [0, 100]]))).toBe('crossing');
+  });
+
+  it('メッシュの番号と範囲が合う', () => {
+    const b = meshBox('53394611');
+    expect(meshCode3((b.south + b.north) / 2, (b.west + b.east) / 2)).toBe('53394611');
+    expect(b.north - b.south).toBeCloseTo(30 / 3600, 12);
+    expect(b.east - b.west).toBeCloseTo(45 / 3600, 12);
+  });
+
+  it('囲んだ形では、形と重なるメッシュだけを取る（L 字のへこみにだけかかるメッシュは取らない）', () => {
+    // 4つのメッシュの角（35.675, 139.7625）をまたぐ L 字。北東のメッシュにはへこみしかかからない
+    const c = { lat: 35.675, lon: 139.7625 };
+    const pts = [[-200, 200], [200, 200], [200, 20], [-20, 20], [-20, -200], [-200, -200]];
+    const poly = pts.map(([x, z]) => ({ lat: c.lat - z! / m.lat, lon: c.lon + x! / m.lon }));
+    const all = meshCodesForBox(polygonBox(poly));
+    const used = meshCodesForPolygon(poly);
+    expect(all.length).toBe(4);
+    expect(used.length).toBe(3);
+    expect(used).not.toContain(meshCode3(c.lat + 0.001, c.lon + 0.001)); // 北東
   });
 
   it('囲んだ形では、形の緯度経度の範囲にかかるメッシュだけを取る（正方形の余白の分は取らない）', () => {

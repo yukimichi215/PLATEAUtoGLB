@@ -6,8 +6,7 @@ import { buildCredit, LICENSE_TEXT, type UsedFile } from './credit.js';
 import { LocalProjector, meshCodesForBox, type LatLon } from './geo.js';
 import { makeZip, stlHeader, toMtl, toObj, toStl } from './export.js';
 import { buildGlb, GROUPS } from './glb.js';
-import { localRingOf, MAX_SIZE, MIN_SIZE, polygonBox } from './area.js';
-import { isSimpleRing } from './geometry.js';
+import { localRingOf, MAX_SIZE, meshCodesForPolygon, MIN_SIZE, polygonIssue } from './area.js';
 import { finishForPrint, ROAD_PRINT_MM, scalePieces, validatePrint, type PrintInfo, type PrintOptions } from './print.js';
 import { SceneBuilder, type BuildingInfo, type MeshPart, type ModelPiece } from './scene.js';
 
@@ -74,9 +73,11 @@ export function validateRequest(req: AreaRequest): void {
   }
   if (req.print) validatePrint(req.print);
   if (req.polygon) {
-    if (req.polygon.length < 3) throw new Error('範囲は3点以上で囲んでください。');
+    const issue = polygonIssue(req.polygon);
+    if (issue === 'tooFew') throw new Error('範囲は3点以上で囲んでください。');
+    if (issue === 'tooSmall') throw new Error('囲んだ形の面積がほぼありません。点が一直線に並んでいないか確かめてください。');
+    if (issue === 'crossing') throw new Error('範囲の線が交差しています。交差しないように囲み直してください。');
     const ring = localRing(req)!;
-    if (!isSimpleRing(ring)) throw new Error('範囲の線が交差しています。交差しないように囲み直してください。');
     const half = req.size / 2 + 0.5;
     for (let i = 0; i < ring.length; i++) {
       if (Math.abs(ring[i]!) > half) {
@@ -92,8 +93,8 @@ export function validateRequest(req: AreaRequest): void {
 
 export async function planArea(req: AreaRequest, fetchJson: FetchJson): Promise<AreaPlan> {
   validateRequest(req);
-  // 囲んだ形のときは、形の緯度経度の範囲にかかるメッシュだけを取る（正方形の余白の分まで取らない）
-  const meshes = meshCodesForBox(req.polygon ? polygonBox(req.polygon) : new LocalProjector(req.center).boxAround(req.size / 2));
+  // 囲んだ形のときは、形に重なるメッシュだけを取る（正方形の余白・形のへこみの分まで取らない）
+  const meshes = req.polygon ? meshCodesForPolygon(req.polygon) : meshCodesForBox(new LocalProjector(req.center).boxAround(req.size / 2));
   const types: FeatureType[] = req.includeRoads ? ['bldg', 'tran'] : ['bldg'];
   const files = await findSourceFiles(meshes, types, fetchJson);
   const totalBytes = files.reduce((s, f) => s + f.fileSize, 0);

@@ -136,9 +136,13 @@ function onDrawChange(s: DrawState): void {
 }
 
 function drawHint(s: DrawState): string {
-  if (s.issue === 'crossing') return '線が交差しています。「描き直す」で、線が交差しないように囲み直してください。';
+  if (s.issue === 'tooSmall') return '囲んだ形の面積がほぼありません。「描き直す」で、点が一直線に並ばないように囲み直してください。';
+  if (s.issue === 'crossing') return '線が交差しているか、1点で触れています。「描き直す」で、線が交差・接しないように囲み直してください。';
   if (s.issue === 'tooLarge') return `囲んだ範囲が大きすぎます（一辺 ${MAX_SIZE} m の正方形に入る大きさまで。今は約 ${s.size} m）。`;
-  if (s.polygon) return `囲んだ範囲：一辺 約 ${s.size} m の正方形に入る大きさ（${s.polygon.length} 点）。描き直すときは「描き直す」を押します。`;
+  if (s.polygon) {
+    return `囲んだ範囲：一辺 約 ${s.size} m の正方形に入る大きさ（${s.polygon.length} 点）。描き直すときは「描き直す」を押します。` +
+      '囲んだ線にかかる大きな建物も、中心が中にあれば丸ごと入るので、線より少し大きく出ることがあります。';
+  }
   if (s.mode === 'rect') return '地図の上で、押したまま動かして四角を描きます（このあいだ地図はドラッグで動かせません。拡大・縮小はホイール・2本指・＋−で）。';
   if (s.mode === 'polygon') {
     return s.drawingPoints === 0
