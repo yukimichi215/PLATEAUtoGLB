@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CoverageIndex, coverageUrl, lodOfMesh, mesh2CodesForBox, parseCoverage } from '../src/core/coverage.js';
-import { LocalProjector, meshCode3 } from '../src/core/geo.js';
+import { meshCodesForArea, meshCodesForPolygon } from '../src/core/area.js';
+import { LocalProjector, meshCode3, meshCodesForBox } from '../src/core/geo.js';
 
 // データカタログ API の答えの形（実物の一部を短くしたもの）
 const tokyo = {
@@ -54,7 +55,7 @@ describe('PLATEAU の建物データがある場所', () => {
     expect(meshCode3(TOKYO_STATION.lat, TOKYO_STATION.lon)).toBe('53394611');
     expect(await idx.lodAt(TOKYO_STATION.lat, TOKYO_STATION.lon)).toBe(2);
     expect(await idx.lodAt(NO_DATA.lat, NO_DATA.lon)).toBeUndefined();
-    const none = await idx.areaCoverage(new LocalProjector(NO_DATA).boxAround(150));
+    const none = await idx.areaCoverage(meshCodesForArea({ center: NO_DATA, size: 300 }));
     expect(none.covered).toBe(0);
     expect(none.total).toBeGreaterThan(0);
   });
@@ -63,16 +64,30 @@ describe('PLATEAU の建物データがある場所', () => {
     const idx = new CoverageIndex(fakeFetch().fetchJson);
     // 東京駅のメッシュ（53394611）と、その東隣（53394612。この偽の答えではデータなし）にまたがる範囲
     const box = { south: 35.68, north: 35.6825, west: 139.7720, east: 139.7780 };
-    const r = await idx.areaCoverage(box);
+    const r = await idx.areaCoverage(meshCodesForBox(box));
     expect(r.total).toBe(2);
     expect(r.covered).toBe(1);
+  });
+
+  it('自由な形で囲んだときは、作るときと同じ数え方（meshCodesForPolygon）で数える', async () => {
+    const idx = new CoverageIndex(fakeFetch().fetchJson);
+    // 細長い三角形：囲む四角には入るが、形には重ならないメッシュがある
+    const polygon = [
+      { lat: 35.676, lon: 139.760 },
+      { lat: 35.676, lon: 139.790 },
+      { lat: 35.690, lon: 139.790 },
+    ];
+    const meshes = meshCodesForArea({ center: TOKYO_STATION, size: 3000, polygon });
+    expect(meshes).toEqual(meshCodesForPolygon(polygon));
+    const r = await idx.areaCoverage(meshes);
+    expect(r.total).toBe(meshes.length);
   });
 
   it('同じ2次メッシュは1回しか問い合わせない', async () => {
     const f = fakeFetch();
     const idx = new CoverageIndex(f.fetchJson);
     await idx.lodAt(TOKYO_STATION.lat, TOKYO_STATION.lon);
-    await idx.areaCoverage(new LocalProjector(TOKYO_STATION).boxAround(500));
+    await idx.areaCoverage(meshCodesForArea({ center: TOKYO_STATION, size: 1000 }));
     await idx.cells(new LocalProjector(TOKYO_STATION).boxAround(500));
     expect(f.calls.filter((u) => u === coverageUrl('533946'))).toHaveLength(1);
   });

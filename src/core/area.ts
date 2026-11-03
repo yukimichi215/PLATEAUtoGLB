@@ -108,3 +108,12 @@ export function areaM2(size: number, polygon?: LatLon[]): number {
   if (!polygon || polygon.length < 3) return size * size;
   return ringArea(localRingOf(polygon, areaOfPolygon(polygon).center));
 }
+
+/**
+ * 切り出す範囲に重なる3次メッシュ（データを取る単位）。作るとき（pipeline の planArea）と、
+ * データのない所の警告（画面）で同じ数え方をするため、ここにまとめる。
+ * 囲んだ形のときは形に重なるメッシュだけ、正方形のときは正方形に重なるメッシュ。
+ */
+export function meshCodesForArea(area: { center: LatLon; size: number; polygon?: LatLon[] }): string[] {
+  return area.polygon ? meshCodesForPolygon(area.polygon) : meshCodesForBox(new LocalProjector(area.center).boxAround(area.size / 2));
+}

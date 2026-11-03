@@ -1,8 +1,8 @@
 // 画面の操作。重い処理は worker.ts に任せる。
-import { areaOfPolygon, MAX_SIZE, polygonBox } from '../core/area.js';
+import { areaOfPolygon, MAX_SIZE, meshCodesForArea } from '../core/area.js';
 import { fetchCatalogJson } from '../core/catalog.js';
 import { CoverageIndex, type AreaCoverage } from '../core/coverage.js';
-import { LocalProjector, type LatLonBox } from '../core/geo.js';
+import type { LatLonBox } from '../core/geo.js';
 import { searchPlace, type Place } from '../core/geocode.js';
 import type { AreaPlan, AreaRequest, DownloadKind, GenerateStats } from '../core/pipeline.js';
 import type { PrintOptions } from '../core/print.js';
@@ -215,17 +215,17 @@ let coverageToken = 0;
 /** 地図の枠：null は「広く表示しているので出さない」 */
 let legendZoomedOut = false;
 
-/** 今の切り出す範囲（正方形か、囲み終えた形） */
-function currentAreaBox(): LatLonBox | null {
+/** 今の切り出す範囲に重なる3次メッシュ（作るときと同じ数え方。正方形か、囲み終えた形） */
+function currentAreaMeshes(): string[] | null {
   if (!selected) return null;
-  if (draw.mode === 'square') return new LocalProjector(selected).boxAround(Number(sizeEl.value) / 2);
-  return draw.polygon && !draw.issue ? polygonBox(draw.polygon) : null;
+  if (draw.mode === 'square') return meshCodesForArea({ center: selected, size: Number(sizeEl.value) });
+  return draw.polygon && !draw.issue ? meshCodesForArea({ center: selected, size: 0, polygon: draw.polygon }) : null;
 }
 
 async function checkCoverage(): Promise<void> {
-  const box = currentAreaBox();
+  const meshes = currentAreaMeshes();
   const token = ++coverageToken;
-  if (!box) {
+  if (!meshes) {
     coverageState = null;
     renderCoverage();
     return;
@@ -233,7 +233,7 @@ async function checkCoverage(): Promise<void> {
   coverageState = { kind: 'checking' };
   renderCoverage();
   try {
-    const result = await coverage.areaCoverage(box);
+    const result = await coverage.areaCoverage(meshes);
     if (token !== coverageToken) return;
     coverageState = { kind: 'done', result };
   } catch {

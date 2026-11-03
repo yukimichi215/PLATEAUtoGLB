@@ -80,9 +80,8 @@ export class CoverageIndex {
     return next;
   }
 
-  /** 範囲に重なる3次メッシュのうち、建物データのある数 */
-  async areaCoverage(box: LatLonBox): Promise<AreaCoverage> {
-    const meshes = meshCodesForBox(box);
+  /** 3次メッシュ（切り出す範囲に重なるもの。area.ts の meshCodesForArea）のうち、建物データのある数 */
+  async areaCoverage(meshes: string[]): Promise<AreaCoverage> {
     let covered = 0;
     for (const m of meshes) {
       const cov = await this.forMesh2(m.slice(0, 6));

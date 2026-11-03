@@ -67,11 +67,11 @@ export const en: Record<MessageKey, string> = {
   'map.attribution': '地理院タイル (GSI Tiles)',
   'coverage.checking': 'Checking whether PLATEAU building data exists here…',
   'coverage.none':
-    'There is no PLATEAU building data here (the 3D city model has not been made for this area yet). A model made here will have no buildings. Choose a place inside the green boxes on the map.',
+    'There is no PLATEAU building data here (the 3D city model has not been made for this area yet). A model made here will have no buildings. Choose a place inside the green boxes on the map. If there are no green boxes nearby, the surrounding area has not been made yet either.',
   'coverage.partial':
     'Only part of the chosen area has PLATEAU building data ({covered} of {total} blocks of about 1 km). Outside the green boxes there will be no buildings.',
   'coverage.failed': 'Could not check whether PLATEAU data exists here (network problem). You can still make the model.',
-  'map.legend': 'Green boxes: places with PLATEAU building data (blocks of about 1 km). There is no data outside the boxes.',
+  'map.legend': 'Green boxes: places with PLATEAU building data (blocks of about 1 km). There is no data outside the boxes. Zoom out a little to see the whole area with data.',
   'map.legend.zoomOut': 'The map is zoomed out too far to show the boxes for places with data (zoom in to see them).',
   'map.hint.square': 'The blue square on the map is the area to cut out. Choose its size below.',
   'map.hint.rect': 'Press and drag on the map to draw a rectangle (the map cannot be dragged meanwhile; zoom with the wheel, two fingers or +/−).',
