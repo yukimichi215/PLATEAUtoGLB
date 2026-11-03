@@ -178,7 +178,7 @@ function currentRequest(): AreaRequest {
   return {
     center: { lat: selected!.lat, lon: selected!.lon },
     size: Number(sizeEl.value),
-    lod: detail === 'box' ? 1 : 2,
+    lod: detail === 'box' ? 1 : detail === 'lod3' ? 3 : 2,
     installations: detail === 'roofPlus',
     includeRoads: roadsEl.checked,
     includeGround: groundEl.checked,
@@ -256,6 +256,17 @@ makeBtn.addEventListener('click', async () => {
         s.buildingsWithInstallations > 0
           ? `${s.buildingsWithInstallations.toLocaleString()} 棟`
           : 'なし（この地域のデータには入っていません）',
+      );
+    }
+    // 選んだ細かさのデータがなく、粗い形で代わりに作った建物
+    const wanted = plan.request.lod;
+    const fallback = ([3, 2, 1] as const).filter((l) => l < wanted && s.lodUsed[l] > 0);
+    if (fallback.length > 0) {
+      const names = { 1: '箱型', 2: '屋根の形', 3: '窓・扉まで' } as const;
+      const n = fallback.reduce((sum, l) => sum + s.lodUsed[l], 0);
+      addStat(
+        'データがなく粗い形で代わりに作った建物',
+        `${n.toLocaleString()} 棟（${fallback.map((l) => `${names[l]} ${s.lodUsed[l].toLocaleString()}`).join('・')}）`,
       );
     }
     if (plan.request.includeRoads) addStat('道路', `${s.roads.toLocaleString()} 本`);

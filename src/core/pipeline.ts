@@ -19,7 +19,7 @@ export interface AreaRequest {
   center: LatLon;
   /** 切り出す正方形の一辺（m） */
   size: number;
-  /** 1 = 箱型、2 = 屋根の形あり、3 = 窓・扉まで（試作。LOD3 のない建物は LOD2 → LOD1 で代用） */
+  /** 1 = 箱型、2 = 屋根の形あり、3 = 窓・扉まで（LOD3 のない建物は LOD2 → LOD1 で代用） */
   lod: 1 | 2 | 3;
   /** ベランダ・ひさし・屋上の設備などの付属物を入れる（LOD2・LOD3 のとき） */
   installations?: boolean;
@@ -101,6 +101,8 @@ export interface GenerateStats {
   buildingsWithInstallations: number;
   /** 窓・扉まである形（LOD3）で入れた建物の数 */
   lod3Buildings: number;
+  /** 実際に使った細かさごとの建物の数（選んだ細かさのデータがない建物は、粗いもので代わりに作る） */
+  lodUsed: Record<1 | 2 | 3, number>;
   /** 3Dプリンタ用のとき：縮尺・印刷したときの大きさ（mm） */
   print?: PrintInfo;
   /** 利用者に知らせたい注意（できあがりに出す） */
@@ -318,6 +320,11 @@ export async function generateFromPlan(
       skippedBuildings: scene.skippedBuildings,
       buildingsWithInstallations: scene.buildingsWithInstallations,
       lod3Buildings: scene.lod3Buildings,
+      lodUsed: {
+        1: scene.buildings.filter((b) => b.lodUsed === 1).length,
+        2: scene.buildings.filter((b) => b.lodUsed === 2).length,
+        3: scene.buildings.filter((b) => b.lodUsed === 3).length,
+      },
       print,
       warnings,
     },
