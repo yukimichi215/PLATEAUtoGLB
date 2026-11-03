@@ -10,6 +10,7 @@ import { AreaMap, type AreaMode, type DrawState } from './area-map.js';
 import { situationEvidence, SITUATIONS, type Situation, type Text } from '../core/situation.js';
 import { Preview, type ViewName } from './preview.js';
 import { CityListView } from './city-list-view.js';
+import { pickable, setPicked } from './pick.js';
 import type { CityEntry } from './city-list.js';
 import { evidenceText } from './evidence-text.js';
 import { applyStatic, lang, onLangChange, setLang, t, type Lang } from './i18n/index.js';
@@ -300,15 +301,21 @@ searchForm.addEventListener('submit', async (ev) => {
     if (places.length === 0) {
       showMessage(t('search.notFound'), true);
     } else if (places.length === 1) {
+      setPicked(null);
       selectPlace(places[0]!);
     } else {
       showMessage(t('search.choose'));
+      setPicked(null);
       for (const p of places) {
         const li = document.createElement('li');
         const b = document.createElement('button');
         b.type = 'button';
         b.textContent = coreText(p.title);
-        b.addEventListener('click', () => selectPlace(p));
+        pickable(b, `search:${places.indexOf(p)}`);
+        b.addEventListener('click', () => {
+          setPicked(`search:${places.indexOf(p)}`);
+          selectPlace(p);
+        });
         li.appendChild(b);
         candidatesEl.appendChild(li);
       }
@@ -349,15 +356,20 @@ function renderSituationPlaces(): void {
   situationPlaces.replaceChildren();
   situationNote.textContent = s ? t('situation.note', { approximation: s.approximation[lang()] }) : '';
   if (!s) return;
-  for (const p of s.places) {
+  s.places.forEach((p, i) => {
     const li = document.createElement('li');
     const b = document.createElement('button');
     b.type = 'button';
     b.textContent = t('situation.place', { name: p.name[lang()], note: p.note[lang()] });
-    b.addEventListener('click', () => selectPlace({ lat: p.lat, lon: p.lon, title: p.name.ja }, s, p.name));
+    const key = `situation:${s.id}:${i}`;
+    pickable(b, key);
+    b.addEventListener('click', () => {
+      setPicked(key);
+      selectPlace({ lat: p.lat, lon: p.lon, title: p.name.ja }, s, p.name);
+    });
     li.appendChild(b);
     situationPlaces.appendChild(li);
-  }
+  });
 }
 situationSelect.addEventListener('change', renderSituationPlaces);
 
