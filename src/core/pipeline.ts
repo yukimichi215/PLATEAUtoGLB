@@ -4,6 +4,7 @@ import { findSourceFiles, type FeatureType, type FetchJson, type SourceFile } fr
 import { readCityGml } from './citygml.js';
 import { buildCredit, LICENSE_TEXT, type UsedFile } from './credit.js';
 import { LocalProjector, meshCodesForBox, type LatLon } from './geo.js';
+import { makeZip, toMtl, toObj, toStl } from './export.js';
 import { buildGlb } from './glb.js';
 import { SceneBuilder, type BuildingInfo } from './scene.js';
 
@@ -84,6 +85,11 @@ export interface GenerateStats {
 
 export interface GenerateResult {
   glb: Uint8Array;
+  /** OBJ（文字）。色は mtl。どちらも先頭に出典を書いてある */
+  obj: string;
+  mtl: string;
+  /** バイナリ形式の STL */
+  stl: Uint8Array;
   credit: string;
   copyright: string;
   stats: GenerateStats;
@@ -105,6 +111,9 @@ function detailCode(req: AreaRequest): string {
   if (req.lod === 3) return req.installations ? 'lod3plus' : 'lod3';
   return req.lod === 1 ? 'lod1' : req.installations ? 'lod2plus' : 'lod2';
 }
+
+/** STL の先頭（80バイト・英数字のみ）に書く文。出典の全文は一緒に出すクレジットの文章ファイルにある */
+export const STL_HEADER = 'Made from Project PLATEAU 3D city model (MLIT Japan), modified. See credit.txt';
 
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -171,7 +180,7 @@ export async function generateFromPlan(
   }
   if (req.includeGround) scene.addGround();
 
-  onProgress({ ratio: 1, message: 'GLB を作成中…' });
+  onProgress({ ratio: 1, message: '3D モデルを作成中…' });
   const createdAt = today();
   const place = req.placeName?.trim() || `${req.center.lat.toFixed(5)},${req.center.lon.toFixed(5)}`;
   const detail = detailLabel(req);
@@ -205,6 +214,10 @@ export async function generateFromPlan(
   };
 
   const glb = await buildGlb({ parts: scene.parts, copyright: credit.short, extras, name: `PLATEAU_${safeFileName(place)}` });
+  const fileName = `plateau_${safeFileName(place)}_${req.size}m_${detailCode(req)}`;
+  const obj = toObj(scene.parts, credit.text, `${fileName}.mtl`);
+  const mtl = toMtl(scene.parts, credit.text);
+  const stl = toStl(scene.parts, STL_HEADER);
 
   // 外形
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
@@ -223,10 +236,13 @@ export async function generateFromPlan(
   const r1 = (v: number) => Math.round(v * 10) / 10;
   return {
     glb,
+    obj,
+    mtl,
+    stl,
     credit: credit.text,
     copyright: credit.short,
     buildings: scene.buildings,
-    fileName: `plateau_${safeFileName(place)}_${req.size}m_${detailCode(req)}`,
+    fileName,
     stats: {
       buildings: scene.buildings.length,
       roads: scene.roadCount,
@@ -240,6 +256,38 @@ export async function generateFromPlan(
       buildingsWithInstallations: scene.buildingsWithInstallations,
       lod3Buildings: scene.lod3Buildings,
     },
+  };
+}
+
+export type DownloadKind = 'glb' | 'obj' | 'stl' | 'all' | 'credit';
+
+export interface DownloadFile {
+  name: string;
+  data: Uint8Array;
+  mime: string;
+}
+
+/**
+ * 保存するファイル。OBJ・STL はファイルの中に出典を書ききれないので、
+ * クレジットの文章ファイルと一緒に zip にする（出典がファイルから離れないように）。
+ * GLB は中に出典を書いてあるので、そのまま（クレジットの文章は別に保存できる）。
+ */
+export function downloadFiles(result: GenerateResult): Record<DownloadKind, DownloadFile> {
+  const base = result.fileName;
+  const credit = { name: `${base}_credit.txt`, data: new TextEncoder().encode(result.credit) };
+  const glb = { name: `${base}.glb`, data: result.glb };
+  const obj = [
+    { name: `${base}.obj`, data: result.obj },
+    { name: `${base}.mtl`, data: result.mtl },
+  ];
+  const stl = { name: `${base}.stl`, data: result.stl };
+  const zip = 'application/zip';
+  return {
+    glb: { ...glb, mime: 'model/gltf-binary' },
+    obj: { name: `${base}_obj.zip`, data: makeZip([...obj, credit]), mime: zip },
+    stl: { name: `${base}_stl.zip`, data: makeZip([stl, credit]), mime: zip },
+    all: { name: `${base}_all.zip`, data: makeZip([glb, ...obj, stl, credit]), mime: zip },
+    credit: { ...credit, mime: 'text/plain;charset=utf-8' },
   };
 }
 

@@ -33,7 +33,7 @@ fn safe_file_name(name: &str) -> String {
     if trimmed.is_empty() { "plateau.glb".to_string() } else { trimmed }
 }
 
-/// 画面で作ったファイル（GLB・クレジット）を、保存先を選ぶ窓で選んだ場所に書く。
+/// 画面で作ったファイル（GLB・OBJ や STL の zip・クレジット）を、保存先を選ぶ窓で選んだ場所に書く。
 /// 中身は本文（バイト列）で、ファイル名は x-file-name で受け取る。
 /// 保存したら true、取りやめたら false を返す。
 #[tauri::command]
@@ -60,6 +60,7 @@ async fn save_file(request: Request<'_>) -> Result<bool, String> {
         dialog = match ext.as_str() {
             "glb" => dialog.add_filter("GLB（3Dモデル）", &["glb"]),
             "txt" => dialog.add_filter("テキスト", &["txt"]),
+            "zip" => dialog.add_filter("zip（3Dモデルと出典のまとめ）", &["zip"]),
             _ => dialog,
         };
         let Some(path) = dialog.save_file() else {

@@ -21,12 +21,22 @@ const { values } = parseArgs({
     'no-ground': { type: 'boolean', default: false },
     'max-mb': { type: 'string', default: '1000' },
     'max-file-mb': { type: 'string', default: '200' },
+    /** 書き出す形式（カンマ区切り）：glb, obj, stl */
+    format: { type: 'string', default: 'glb' },
   },
 });
 
 if (!values.lat || !values.lon) {
-  console.error('使い方: npm run cli -- --lat <緯度> --lon <経度> [--size 300] [--lod 1|2|3] [--installations] [--name 名前]');
+  console.error('使い方: npm run cli -- --lat <緯度> --lon <経度> [--size 300] [--lod 1|2|3] [--installations] [--format glb,obj,stl] [--name 名前]');
   process.exit(1);
+}
+
+const formats = new Set(values.format!.split(',').map((f) => f.trim().toLowerCase()));
+for (const f of formats) {
+  if (!['glb', 'obj', 'stl'].includes(f)) {
+    console.error(`形式 ${f} には対応していません（glb, obj, stl）`);
+    process.exit(1);
+  }
 }
 
 const CACHE_DIR = resolve('data/cache');
@@ -115,7 +125,13 @@ const result = await generateFromPlan(plan, openText, (p) => {
 });
 mkdirSync(values.out!, { recursive: true });
 const base = join(values.out!, result.fileName);
-writeFileSync(`${base}.glb`, result.glb);
+// 出典の文章ファイル（_credit.txt）は、どの形式のときも必ず一緒に書き出す
+if (formats.has('glb')) writeFileSync(`${base}.glb`, result.glb);
+if (formats.has('obj')) {
+  writeFileSync(`${base}.obj`, result.obj);
+  writeFileSync(`${base}.mtl`, result.mtl);
+}
+if (formats.has('stl')) writeFileSync(`${base}.stl`, result.stl);
 writeFileSync(`${base}_credit.txt`, result.credit);
 writeFileSync(`${base}_buildings.json`, JSON.stringify(result.buildings, null, 1));
 const mem = process.memoryUsage();

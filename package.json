@@ -2,7 +2,7 @@
   "name": "plateau-to-glb",
   "version": "0.1.0",
   "private": true,
-  "description": "PLATEAU の3D都市モデルから、住所の周りの建物を PlotBlock 用の GLB にするツール",
+  "description": "PLATEAU の3D都市モデルから、住所の周りの建物を 3D モデル（GLB・OBJ・STL）にするツール",
   "type": "module",
   "scripts": {
     "dev": "vite",

@@ -1,0 +1,223 @@
+// GLB 以外の形式（OBJ・STL）での書き出しと、出典の文章と一緒に1つにまとめる zip。
+// OBJ・STL はファイルの中に出典を書ききれない（STL はほぼ書けない）ので、必ずクレジットの文章ファイルと一緒に zip で出す。
+import { GROUPS, MATERIALS } from './glb.js';
+import type { MeshPart, PartName } from './scene.js';
+
+/** OBJ の材質名（.mtl の中の名前。どのソフトでも読めるよう英字にする） */
+const MTL_IDS: Record<PartName, string> = {
+  wall: 'wall',
+  roof: 'roof',
+  detail: 'detail',
+  window: 'window',
+  door: 'door',
+  road: 'road',
+  ground: 'ground',
+};
+
+function comment(text: string): string {
+  return text
+    .trimEnd()
+    .split('\n')
+    .map((l) => `# ${l}`.trimEnd())
+    .join('\n');
+}
+
+/** 小数を短く書く（0.1mm 未満は丸める。メートルで小数第4位） */
+function num(v: number): string {
+  const r = Math.round(v * 1e4) / 1e4;
+  return Object.is(r, -0) ? '0' : String(r);
+}
+
+/**
+ * OBJ（文字のファイル）にする。単位・向きは GLB と同じ（メートル、+Y が上、-Z が北）。
+ * 部品は GLB と同じ名前（Buildings・Roads・Ground）の `o` に分け、材質は .mtl で色を付ける。
+ * 同じ位置の頂点は1つにまとめる（Blender などで形がつながって見えるように）。
+ */
+export function toObj(parts: Record<PartName, MeshPart>, credit: string, mtlFileName: string): string {
+  const out: string[] = [];
+  out.push(comment(credit));
+  out.push('# 単位：メートル。+Y が上、-Z が北。範囲の中心が原点、地面が高さ 0');
+  out.push(`mtllib ${mtlFileName}`);
+  const ids = new Map<string, number>();
+  const vertexLines: string[] = [];
+  const faceLines: string[] = [];
+  for (const group of GROUPS) {
+    const used = group.parts.filter((p) => parts[p].triangleCount > 0);
+    if (used.length === 0) continue;
+    faceLines.push(`o ${group.name}`);
+    for (const partName of used) {
+      const part = parts[partName];
+      faceLines.push(`usemtl ${MTL_IDS[partName]}`);
+      const local: number[] = new Array(part.vertexCount);
+      const p = part.positions;
+      for (let i = 0; i < part.vertexCount; i++) {
+        const key = `${num(p[i * 3]!)} ${num(p[i * 3 + 1]!)} ${num(p[i * 3 + 2]!)}`;
+        let id = ids.get(key);
+        if (id === undefined) {
+          id = ids.size + 1;
+          ids.set(key, id);
+          vertexLines.push(`v ${key}`);
+        }
+        local[i] = id;
+      }
+      const idx = part.indices;
+      for (let t = 0; t < idx.length; t += 3) {
+        const a = local[idx[t]!]!, b = local[idx[t + 1]!]!, c = local[idx[t + 2]!]!;
+        if (a === b || b === c || a === c) continue; // 丸めでつぶれた三角形
+        faceLines.push(`f ${a} ${b} ${c}`);
+      }
+    }
+  }
+  out.push(...vertexLines, ...faceLines);
+  return out.join('\n') + '\n';
+}
+
+/** OBJ の色の設定（.mtl） */
+export function toMtl(parts: Record<PartName, MeshPart>, credit: string): string {
+  const out: string[] = [comment(credit)];
+  for (const group of GROUPS) {
+    for (const partName of group.parts) {
+      if (parts[partName].triangleCount === 0) continue;
+      const m = MATERIALS[partName];
+      out.push('', `# ${m.name}`, `newmtl ${MTL_IDS[partName]}`);
+      out.push(`Kd ${m.color.map((c) => c.toFixed(3)).join(' ')}`);
+      out.push('Ka 0 0 0', 'Ks 0 0 0', 'd 1', 'illum 1');
+    }
+  }
+  return out.join('\n') + '\n';
+}
+
+/**
+ * バイナリ形式の STL にする。単位・向きは GLB と同じ（メートル、+Y が上）。
+ * STL には色がないので、すべての部品を1つの形にまとめる。
+ * 先頭の 80 バイト（英数字のみ）に、出典が別のファイルにあることを書く。
+ */
+export function toStl(parts: Record<PartName, MeshPart>, header: string): Uint8Array {
+  let count = 0;
+  for (const part of Object.values(parts)) count += part.triangleCount;
+  const buf = new ArrayBuffer(84 + count * 50);
+  const bytes = new Uint8Array(buf);
+  const view = new DataView(buf);
+  const ascii = header.replace(/[^\x20-\x7e]/g, '?').slice(0, 80);
+  for (let i = 0; i < ascii.length; i++) bytes[i] = ascii.charCodeAt(i);
+  view.setUint32(80, count, true);
+  let o = 84;
+  for (const group of GROUPS) {
+    for (const partName of group.parts) {
+      const part = parts[partName];
+      const p = part.positions;
+      const idx = part.indices;
+      for (let t = 0; t < idx.length; t += 3) {
+        const a = idx[t]! * 3, b = idx[t + 1]! * 3, c = idx[t + 2]! * 3;
+        // 法線は三角形の頂点の並びから計算する
+        const e1 = [p[b]! - p[a]!, p[b + 1]! - p[a + 1]!, p[b + 2]! - p[a + 2]!];
+        const e2 = [p[c]! - p[a]!, p[c + 1]! - p[a + 1]!, p[c + 2]! - p[a + 2]!];
+        let nx = e1[1]! * e2[2]! - e1[2]! * e2[1]!;
+        let ny = e1[2]! * e2[0]! - e1[0]! * e2[2]!;
+        let nz = e1[0]! * e2[1]! - e1[1]! * e2[0]!;
+        const len = Math.hypot(nx, ny, nz) || 1;
+        nx /= len; ny /= len; nz /= len;
+        for (const v of [nx, ny, nz]) {
+          view.setFloat32(o, v, true);
+          o += 4;
+        }
+        for (const v of [a, b, c]) {
+          view.setFloat32(o, p[v]!, true);
+          view.setFloat32(o + 4, p[v + 1]!, true);
+          view.setFloat32(o + 8, p[v + 2]!, true);
+          o += 12;
+        }
+        view.setUint16(o, 0, true);
+        o += 2;
+      }
+    }
+  }
+  return bytes;
+}
+
+// ---- zip（圧縮なしでまとめるだけ。依存を増やさないため自前で書く） ----
+
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+
+export function crc32(data: Uint8Array): number {
+  let c = 0xffffffff;
+  for (let i = 0; i < data.length; i++) c = CRC_TABLE[(c ^ data[i]!) & 0xff]! ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+export interface ZipEntry {
+  name: string;
+  data: Uint8Array | string;
+}
+
+/** 複数のファイルを1つの zip にする（圧縮なし。ファイル名は UTF-8） */
+export function makeZip(entries: ZipEntry[], date = new Date()): Uint8Array {
+  const enc = new TextEncoder();
+  const dosTime = (date.getHours() << 11) | (date.getMinutes() << 5) | Math.floor(date.getSeconds() / 2);
+  const dosDate = ((Math.max(1980, date.getFullYear()) - 1980) << 9) | ((date.getMonth() + 1) << 5) | date.getDate();
+  const files = entries.map((e) => {
+    const data = typeof e.data === 'string' ? enc.encode(e.data) : e.data;
+    return { name: enc.encode(e.name), data, crc: crc32(data) };
+  });
+  let size = 22;
+  for (const f of files) size += 30 + f.name.length + f.data.length + 46 + f.name.length;
+  const out = new Uint8Array(size);
+  const view = new DataView(out.buffer);
+  let o = 0;
+  const offsets: number[] = [];
+  const header = (sig: number, central: boolean, f: (typeof files)[number], offset: number) => {
+    view.setUint32(o, sig, true);
+    o += 4;
+    if (central) {
+      view.setUint16(o, 20, true); // 作成したバージョン
+      o += 2;
+    }
+    view.setUint16(o, 20, true); // 展開に必要なバージョン
+    view.setUint16(o + 2, 0x0800, true); // ファイル名は UTF-8
+    view.setUint16(o + 4, 0, true); // 圧縮なし
+    view.setUint16(o + 6, dosTime, true);
+    view.setUint16(o + 8, dosDate, true);
+    view.setUint32(o + 10, f.crc, true);
+    view.setUint32(o + 14, f.data.length, true);
+    view.setUint32(o + 18, f.data.length, true);
+    view.setUint16(o + 22, f.name.length, true);
+    view.setUint16(o + 24, 0, true);
+    o += 26;
+    if (central) {
+      view.setUint16(o, 0, true); // コメントの長さ
+      view.setUint16(o + 2, 0, true); // ディスク番号
+      view.setUint16(o + 4, 0, true); // 内部属性
+      view.setUint32(o + 6, 0, true); // 外部属性
+      view.setUint32(o + 10, offset, true);
+      o += 14;
+    }
+    out.set(f.name, o);
+    o += f.name.length;
+  };
+  for (const f of files) {
+    offsets.push(o);
+    header(0x04034b50, false, f, 0);
+    out.set(f.data, o);
+    o += f.data.length;
+  }
+  const centralStart = o;
+  files.forEach((f, i) => header(0x02014b50, true, f, offsets[i]!));
+  const centralSize = o - centralStart;
+  view.setUint32(o, 0x06054b50, true);
+  view.setUint16(o + 4, 0, true);
+  view.setUint16(o + 6, 0, true);
+  view.setUint16(o + 8, files.length, true);
+  view.setUint16(o + 10, files.length, true);
+  view.setUint32(o + 12, centralSize, true);
+  view.setUint32(o + 16, centralStart, true);
+  view.setUint16(o + 20, 0, true);
+  return out;
+}
