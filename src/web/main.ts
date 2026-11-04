@@ -652,7 +652,7 @@ makeBtn.addEventListener('click', async () => {
 
 // 寄付（応援）ボタン
 const renderDonateButtons = () =>
-  renderDonate($('donate'), donateLinks(DONATE_CONFIG, lang(), (s) => t(s === 'ofuse' ? 'donate.ofuse' : 'donate.githubSponsors')));
+  renderDonate($('donate'), donateLinks(DONATE_CONFIG, () => t('donate.ofuse')));
 
 // プレビューの見る向き
 for (const btn of document.querySelectorAll<HTMLButtonElement>('.view-buttons button')) {

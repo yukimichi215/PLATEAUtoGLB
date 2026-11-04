@@ -121,7 +121,7 @@ npm run dev
 
 画面の言語：右上で日本語・English を切り替えられる（最初はブラウザの言語。選んだものを覚える）。文言は `src/web/i18n/ja.ts`・`en.ts`（HTML は `data-i18n` のキーで辞書から入れる）。中身の処理の知らせ（進み具合・エラー）は日本語で作り、英語の画面では `src/web/i18n/core-messages.ts` で訳す。住所・地名の検索は日本語だけ。出典の文章は日本語の原文のあとに英訳を付ける。訳し漏れは `tests/i18n.test.ts` が見つける。
 
-寄付（応援）ボタン：`src/web/donate-config.ts` に OFUSE と GitHub Sponsors の URL（https のみ）を書くと、題名の横（狭い画面では下）にボタンが出る。空ならボタンは出ない。ただのリンクで、外部のスクリプト・画像は読み込まない（GitHub Sponsors の絵はアプリに同梱の自作のもの。OFUSE は公式アイコンを同梱し、公式のボタンの見た目にそろえている）。
+寄付（応援）ボタン：`src/web/donate-config.ts` に OFUSE の URL（https のみ）を書くと、題名の横（狭い画面では下）にボタンが出る。空ならボタンは出ない。ただのリンクで、外部のスクリプト・画像は読み込まない（OFUSE の公式アイコンを同梱し、公式のボタンの見た目にそろえている。日本語・英語とも同じリンク）。
 
 PR を出す前の検証：`npm run typecheck`、`npm test`、`npm run build` がすべて通ること。
 GLB の出力を変えたときは、さらに実データで `npm run cli` と `npm run verify` を実行し、見た目に関わる変更は画面のプレビューのスクリーンショットで確かめる。

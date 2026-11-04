@@ -10,7 +10,6 @@ export const en: Record<MessageKey, string> = {
   'lang.label': 'Language',
   'donate.aria': 'Support this tool',
   'donate.ofuse': 'Support on OFUSE',
-  'donate.githubSponsors': 'Sponsor on GitHub',
 
   'step1.title': 'Find a place',
   'search.placeholder': 'e.g. 東京駅, 大阪市北区梅田, 35.6812, 139.7671',

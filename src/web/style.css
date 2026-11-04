@@ -53,7 +53,6 @@ body {
 .donate { display: flex; flex-wrap: wrap; gap: 6px; }
 .donate-button { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border: 1px solid var(--muted); border-radius: 999px; color: var(--text); font-size: .8rem; text-decoration: none; }
 .donate-button:hover { border-color: var(--text); }
-.donate-button svg { color: #d6457a; }
 /* OFUSE は公式のボタンの見た目にそろえる：白地・両端が丸い・OFUSE BLUE の細い枠と太字 */
 .donate-ofuse { background: #fff; border-color: #2882a7; color: #2882a7; font-weight: 700; }
 .donate-ofuse:hover { border-color: #2882a7; background: #f1f8fb; }

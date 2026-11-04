@@ -9,7 +9,6 @@ export const ja = {
   'lang.label': '表示する言語',
   'donate.aria': 'このツールを応援する',
   'donate.ofuse': 'OFUSEで応援を送る',
-  'donate.githubSponsors': 'GitHub Sponsors で応援',
 
   'step1.title': '場所を探す',
   'search.placeholder': '例：東京駅、大阪市北区梅田、35.6812, 139.7671',
