@@ -89,8 +89,8 @@ export function toObj(
       faceLines.push(`f ${local[idx[t]!]!} ${local[idx[t + 1]!]!} ${local[idx[t + 2]!]!}`);
     }
   }
-  out.push(...vertexLines, ...faceLines);
-  return out.join('\n') + '\n';
+  // 大きな範囲では行数が数十万になり、push(...) の引数の数の上限を超えるので、つなげてから文字列にする
+  return out.concat(vertexLines, faceLines).join('\n') + '\n';
 }
 
 /** OBJ の色の設定（.mtl） */

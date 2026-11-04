@@ -97,7 +97,7 @@ export async function findSourceFiles(
   const all: SourceFile[] = [];
   for (const mesh of meshes) {
     const json = await fetchJson(catalogUrl(mesh, types));
-    all.push(...parseCatalog(json, mesh, types));
+    for (const f of parseCatalog(json, mesh, types)) all.push(f);
   }
   return all;
 }

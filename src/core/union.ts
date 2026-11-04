@@ -83,7 +83,7 @@ export async function unionSolids<K extends string>(
     toDelete.push(merged);
     // 計算の誤差でできる、ごく小さなかけら（体積がほぼ 0 の薄い殻）を除く
     const shells = merged.decompose();
-    toDelete.push(...shells);
+    for (const s of shells) toDelete.push(s);
     const kept = shells.filter((p) => Math.abs(p.volume()) >= minVolume);
     const composed = m.Manifold.compose(kept);
     toDelete.push(composed);
