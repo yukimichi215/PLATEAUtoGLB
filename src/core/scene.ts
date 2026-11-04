@@ -216,11 +216,10 @@ export class SceneBuilder {
     const buildings: ModelPiece[] = this.opt.separate
       ? this.buildingPieces
       : [{ name: 'Buildings', group: 'Buildings', parts: this.parts }];
-    return [
-      ...buildings,
+    return buildings.concat([
       { name: 'Roads', group: 'Roads', parts: this.parts },
       { name: 'Ground', group: 'Ground', parts: this.parts },
-    ];
+    ]);
   }
 
   /**
@@ -244,7 +243,9 @@ export class SceneBuilder {
     if (keep.length !== this.buildings.length) throw new Error('建物の形と一覧の数が合いません');
     const kept = this.buildings.filter((_, i) => keep[i]);
     for (const [i, b] of this.buildings.entries()) if (!keep[i] && b.lodUsed === 3) this.lod3Buildings--;
-    this.buildings.splice(0, this.buildings.length, ...kept);
+    // splice(..., ...kept) は棟数が多いと引数の数の上限を超えるので、長さを0にしてから1件ずつ足す
+    this.buildings.length = 0;
+    for (const b of kept) this.buildings.push(b);
   }
 
   /** 3Dプリンタ用：keep[i] が false の道路の板を外したあとの、道路の本数にする（板が1枚でも残れば数える） */
