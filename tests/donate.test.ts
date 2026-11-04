@@ -26,5 +26,7 @@ describe('寄付ボタン', () => {
   it('https 以外の URL は使わない', () => {
     expect(donateLinks({ ofuse: 'javascript:alert(1)' }, label('ja'))).toEqual([]);
     expect(donateLinks({ ofuse: 'ofuse.me/x' }, label('ja'))).toEqual([]);
+    expect(donateLinks({ ofuse: 'http://example.com' }, label('ja'))).toEqual([]);
+    expect(donateLinks({ ofuse: ' ' }, label('ja'))).toEqual([]);
   });
 });
